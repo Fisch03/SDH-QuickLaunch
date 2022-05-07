@@ -5,7 +5,7 @@
     "flags": [],
     "publish": {
         "discord_id": "431374517462499328",
-        "description": "Quickly Launch Non-Steam-Apps from the Quick Access menu without adding them as Shortcuts"
+        "description": "Quickly Launch Non-Steam-Apps from the Quick Access menu without adding them as Shortcuts",
         "tags": [ "utility" ]
     }    
 }
