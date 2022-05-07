@@ -1,0 +1,140 @@
+<html>
+    <head>
+        <link rel="stylesheet" href="/steam_resource/css/2.css">
+        <link rel="stylesheet" href="/steam_resource/css/39.css">
+        <link rel="stylesheet" href="/steam_resource/css/library.css">
+        <script src="/static/library.js"></script>
+        <style>
+            body {
+                margin-left: 0;
+                margin-right: 0;
+            }
+            #flatpaklist {
+              list-style-type: none;
+              padding: 0;
+              overflow-y: scroll;
+              height: 90%;
+              margin-bottom: 0;
+            }
+
+            #settings {
+                overflow: none;
+                border-top: 1px #23262e solid;
+                bottom: 0;
+                top: 0;
+                width: 100%;
+            }
+            #settings > div {
+                padding: 12px;
+            }
+
+            li {
+                padding: 12px;
+                border-bottom: 1px solid #23262e;
+            }
+        </style>
+    </head>
+    <body style="overflow-y: hidden;">
+        <!--<h2 id="status">Opening UI...</h2>-->
+        <ul id="flatpaklist"></ul>
+        <div id="settings">
+            <div id="status"></div>
+        </div>                                          
+
+        <script>
+            // TODO:
+            // - Hide Shortcut
+            // - Check if Shortcut still exists
+
+            const status = document.getElementById("status")
+
+            async function show_list() {
+                status.innerHTML = "Fetching Packages..."
+
+                let flatpaks = await get_flatpaks();
+                flatpaks.forEach(flatpak => {
+                    let e = document.createElement("li");
+
+                    document.getElementById("flatpaklist").appendChild(e);
+                    e.innerHTML = flatpak.name;
+                    
+                    e.onclick = async function() {
+                        launch_flatpak(flatpak.package);
+                    }
+                });
+
+                status.innerHTML = "Tap a package to launch it"
+            }
+
+            async function launch_flatpak(package) {
+                status.innerHTML = "Updating Shortcut"
+                let id = await get_shortcut();                 
+
+                sc(`Apps.SetShortcutLaunchOptions(${id}, "run ${package}")`); //This does not apply immediately and also cannot be awaited!
+                setTimeout(async () => {
+                    status.innerHTML = "Launching"
+
+                    let gid = await gameid_from_appid(id);
+                    sc(`Apps.RunGame("${gid}","",-1,100)`);
+                    //sc(`Apps.RemoveShortcut(${id})`);
+                    setTimeout(() => {
+                        exit()
+                    }, 1000);
+                }, 100)
+            }
+
+            async function get_shortcut() {
+                let id = await call_plugin_method("get_id", {})
+                if(id == -1) {
+                    id = await create_shortcut()
+                } else if(await gameid_from_appid(id) == -1) {
+                    id = await create_shortcut()
+                }
+
+                return id
+            }
+
+            async function create_shortcut() {
+                let id = (await sc('Apps.AddShortcut("QuickLaunch","/usr/bin/flatpak")')).result;
+                call_plugin_method("set_id", {id: id})
+                return id
+            }
+
+            async function get_flatpaks() {
+                let list = await call_plugin_method("get_flatpaks", {});
+                list = JSON.parse(`[${list}]`);
+                return list;
+            }
+
+            async function gameid_from_appid(appid) {
+                //executint most of js in the tab avoids some errors i cannot explain myself
+                let game = (await execute_in_tab("SP", true, `
+                    async function get_gameid() {
+                        let res = await appStore.GetAppOverviewByAppID(${appid})
+                        return JSON.stringify(res)
+                    }
+                    
+                    get_gameid()
+                `)).result;
+                
+                if(game != "null") {
+                    game = JSON.parse(game);
+                    return game.m_gameid;
+                } else {
+                    return -1
+                }
+            }
+            
+
+            async function sc(action) {
+                return execute_in_tab("SP", true, `SteamClient.${action}`);
+            }
+            
+            function exit() {
+                location.href = "http://127.0.0.1:1337/plugins/iframe";
+            }
+
+            show_list();
+        </script>
+    </body>
+</html>

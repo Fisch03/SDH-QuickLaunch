@@ -1,0 +1,6 @@
+{
+    "name": "Quick Launch",
+    "author": "Fisch03",
+    "main_view_html": "main_view.html",
+    "flags": ["debug", "_root"]
+}
