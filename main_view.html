@@ -8,12 +8,13 @@
             body {
                 margin-left: 0;
                 margin-right: 0;
+                color: #dcdedf;
             }
             #flatpaklist {
               list-style-type: none;
               padding: 0;
               overflow-y: scroll;
-              height: 90%;
+              height: 78%;
               margin-bottom: 0;
             }
 
@@ -32,6 +33,10 @@
                 padding: 12px;
                 border-bottom: 1px solid #23262e;
             }
+
+            #status {
+                color: #969696;
+            }
         </style>
     </head>
     <body style="overflow-y: hidden;">
@@ -39,6 +44,15 @@
         <ul id="flatpaklist"></ul>
         <div id="settings">
             <div id="status"></div>
+            <div class="gamepaddialog_FieldLabelRow_H9WOq">
+                <div class="gamepaddialog_FieldLabel_3b0U-">
+                    Add as a seperate Shortcut
+                </div>
+                <div id="shortcutToggle" tabindex="0" class="gamepaddialog_Toggle_24G4g Focusable" onclick="handleShortcutToggle()">
+                    <div class="gamepaddialog_ToggleRail_2JtC3"></div>
+                    <div class="gamepaddialog_ToggleSwitch_3__OD"></div>
+                </div>
+            </div>
         </div>                                          
 
         <script>
@@ -47,6 +61,7 @@
             // - Check if Shortcut still exists
 
             const status = document.getElementById("status")
+            let createShortcut = false
 
             async function show_list() {
                 status.innerHTML = "Fetching Packages..."
@@ -59,11 +74,40 @@
                     e.innerHTML = flatpak.name;
                     
                     e.onclick = async function() {
-                        launch_flatpak(flatpak.package);
+                        if(createShortcut) {
+                            let id = await create_shortcut(flatpak.name);
+                            sc(`Apps.SetShortcutLaunchOptions(${id}, "run ${flatpak.package}")`);
+                            status.innerHTML = "Shortcut created."
+                            setTimeout(()=>status.innerHTML="Tap a package to launch it", 1000)
+                        } else {
+                            launch_flatpak(flatpak.package);
+                        }
+
                     }
                 });
 
                 status.innerHTML = "Tap a package to launch it"
+            }
+
+            function setToggleState(id, state) {
+                //Shamelessly stolen from https://github.com/SteamDeckHomebrew/ExtraSettingsPlugin/blob/main/main_view.html
+                const ENABLED_CLASS = "gamepaddialog_On_3ld7T";
+                let toggle = document.getElementById(id);
+
+                if (state && !toggle.classList.contains(ENABLED_CLASS)) {
+                    toggle.classList.add(ENABLED_CLASS);
+                }
+
+                if (!state && toggle.classList.contains(ENABLED_CLASS)) {
+                    toggle.classList.remove(ENABLED_CLASS);
+                }
+            }
+
+            function handleShortcutToggle() {
+                let toggle = document.getElementById("shortcutToggle");
+                let isActive = toggle.classList.contains("gamepaddialog_On_3ld7T");
+                createShortcut = !isActive;
+                setToggleState("shortcutToggle", !isActive);
             }
 
             async function launch_flatpak(package) {
@@ -86,17 +130,18 @@
             async function get_shortcut() {
                 let id = await call_plugin_method("get_id", {})
                 if(id == -1) {
-                    id = await create_shortcut()
+                    id = await create_shortcut("QuickLaunch");
+                    call_plugin_method("set_id", {id: id});
                 } else if(await gameid_from_appid(id) == -1) {
-                    id = await create_shortcut()
+                    id = await create_shortcut("QuickLaunch");
+                    call_plugin_method("set_id", {id: id});
                 }
 
                 return id
             }
 
-            async function create_shortcut() {
-                let id = (await sc('Apps.AddShortcut("QuickLaunch","/usr/bin/flatpak")')).result;
-                call_plugin_method("set_id", {id: id})
+            async function create_shortcut(name) {
+                let id = (await sc(`Apps.AddShortcut("${name}","/usr/bin/flatpak")`)).result;
                 return id
             }
 
@@ -107,7 +152,7 @@
             }
 
             async function gameid_from_appid(appid) {
-                //executint most of js in the tab avoids some errors i cannot explain myself
+                //executing most of js in the tab avoids some errors i cannot explain myself
                 let game = (await execute_in_tab("SP", true, `
                     async function get_gameid() {
                         let res = await appStore.GetAppOverviewByAppID(${appid})
