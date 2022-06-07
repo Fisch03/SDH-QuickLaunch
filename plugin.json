@@ -1,8 +1,7 @@
 {
     "name": "Quick Launch",
     "author": "Fisch03",
-    "main_view_html": "main_view.html",
-    "flags": ["root"],
+    "flags": ["debug", "root"],
     "publish": {
         "discord_id": "431374517462499328",
         "description": "Quickly Launch Non-Steam-Apps from the Quick Access menu without adding them as Shortcuts, or add them to the Steam Library.",

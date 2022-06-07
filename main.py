@@ -9,7 +9,7 @@ class Plugin:
         packages = proc.communicate()[0]
         packages = packages.decode("utf-8")
         packages = packages[:-2]
-        return packages
+        return "["+packages+"]"
 
     async def get_id(self):
         with open(os.path.join(confdir,"scid.txt"), "r") as sc:
