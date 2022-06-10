@@ -4,7 +4,7 @@ import { App, FlatpakApp, isFlatpak } from "./apptypes";
 
 export const createShortcut = (name: string) => {
     //@ts-ignore
-    let id:number = SteamClient.Apps.AddShortcut(name,"/usr/bin/flatpak")
+    let id:Promise<number> = SteamClient.Apps.AddShortcut(name,"/usr/bin/flatpak")
     return id
 }
 
@@ -31,20 +31,26 @@ export const fetchApps = async (sAPI: ServerAPI): Promise<App[]> => {
   
 export const launchApp = async (sAPI: ServerAPI, app: App) => {
     let id: number = await getShortcutID(sAPI);       
-    let launchOptions: string = ""      
-  
-    if(isFlatpak(app)) {
-       launchOptions = `run ${app.package}`
-    }
+    
+    setLaunchOptions(id, app);
 
-    //@ts-ignore
-    SteamClient.Apps.SetShortcutLaunchOptions(id, launchOptions); //This does not apply immediately and also cannot be awaited!
-    setTimeout(async () => {
-        let gid = await gameIDFromAppID(id);
+    setTimeout(() => {
+        let gid = gameIDFromAppID(id);
         //@ts-ignore
         SteamClient.Apps.RunGame(gid,"",-1,100);
     }, 500)
   }
+
+export const setLaunchOptions = (scID: number, app: App) =>{
+    let launchOptions: string = ""      
+    if(isFlatpak(app)) {
+       launchOptions = `run ${app.package}`
+    }
+
+    console.log(scID)
+    //@ts-ignore
+    SteamClient.Apps.SetShortcutLaunchOptions(scID, launchOptions); //This does not apply immediately and also cannot be awaited!
+}
 
 export const getShortcutID = async (sAPI: ServerAPI) => {
     const result = await sAPI.callPluginMethod<any, number>("get_id", {} as any)

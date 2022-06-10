@@ -1,28 +1,28 @@
 import {
   definePlugin,
-  Menu,
-  MenuItem,
   ServerAPI,
-  showContextMenu,
   staticClasses,
   Dropdown,
   DropdownOption,
   PanelSection,
   PanelSectionRow,
-  ButtonItem
+  ButtonItem,
+  Toggle
 } from "decky-frontend-lib";
 import { Fragment, useLayoutEffect } from "react";
 import { VFC, useState } from "react";
 import { FaRocket } from "react-icons/fa";
 
 import { App } from "./apptypes";
-import { fetchApps, launchApp } from "./utils";
+import { fetchApps, launchApp, createShortcut, setLaunchOptions } from "./utils";
 
 let appList: App[] = [];
 
 const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   const [dropdownOptions, setDropdownOptions] = useState<DropdownOption[]>([]);
   const [selectedApp, setSelectedApp] = useState<number | null>(null);
+  const [createNewShortcut, setCreateNewShortcut] = useState(false);
+  const [buttonText, setButtonText] = useState<string>();
 
   useLayoutEffect(() => {
     (async () => {
@@ -40,6 +40,21 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     })();
   }, []);
 
+  useLayoutEffect(() => {
+    createNewShortcut? setButtonText("Create!") : setButtonText("Launch!");
+  }, [createNewShortcut]);
+
+  function doButtonAction() {
+    if(selectedApp === null) return;
+
+    let app = appList[selectedApp];
+    if(createNewShortcut) {
+      createShortcut(app.name).then((id:number) => setLaunchOptions(id, app))
+    } else {
+      launchApp(serverAPI, app);
+    }
+  }
+
   return (
     <Fragment>
       <PanelSection>
@@ -52,9 +67,18 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <ButtonItem layout="below" onClick={() => {if(selectedApp !== null) launchApp(serverAPI, appList[selectedApp])}}>
-            Launch!
+          <ButtonItem layout="below" onClick={() => doButtonAction()}>
+            {buttonText}
           </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
+      <PanelSection title="Settings">
+        <PanelSectionRow>
+          <Toggle
+            label="Add as a separate Shortcut"
+            checked={createNewShortcut}
+            onChange={(e) => setCreateNewShortcut(e)}
+          />
         </PanelSectionRow>
       </PanelSection>
     </Fragment>
