@@ -20,13 +20,13 @@ export const gameIDFromAppID = (appid: number) => {
 }
 
 export const fetchApps = async (sAPI: ServerAPI): Promise<App[]> => {
-    const result = await sAPI.callPluginMethod<any, any>("get_flatpaks", {} as any); 
+    const result = await sAPI.callPluginMethod<any, any>("get_flatpaks", {}); 
     let flatpaks: FlatpakApp[] = []
     if(result.success) {
         flatpaks = JSON.parse(result.result);
     }
 
-    return [...flatpaks] as App[]
+    return [...flatpaks]
   }
   
 export const launchApp = async (sAPI: ServerAPI, app: App) => {
@@ -53,7 +53,7 @@ export const setLaunchOptions = (scID: number, app: App) =>{
 }
 
 export const getShortcutID = async (sAPI: ServerAPI) => {
-    const result = await sAPI.callPluginMethod<any, number>("get_id", {} as any)
+    const result = await sAPI.callPluginMethod<any, number>("get_id", {})
 
     if(result.success) {
         let id: number = result.result;

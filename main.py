@@ -1,4 +1,4 @@
-import os
+import os, json
 from subprocess import Popen, PIPE
 
 confdir = "/home/deck/.config/SDH-QuickLaunch/"
@@ -10,6 +10,18 @@ class Plugin:
         packages = packages.decode("utf-8")
         packages = packages[:-2]
         return "["+packages+"]"
+
+    async def get_config(self):
+        with open(os.path.join(confdir,"config.json"), "r") as f:
+            return json.load(f)
+
+    async def set_config_value(self, key, value):
+        config = json.load(open(os.path.join(confdir,"config.json")))
+        config[key] = value
+        with open(os.path.join(confdir,"config.json"), "w") as f:
+            json.dump(config, f)
+
+        return config
 
     async def get_id(self):
         with open(os.path.join(confdir,"scid.txt"), "r") as sc:
@@ -32,6 +44,12 @@ class Plugin:
         
         try:
             sc = open(os.path.join(confdir,"scid.txt"), "x")
+            sc.close()
+        except FileExistsError:
+            pass
+        try:
+            sc = open(os.path.join(confdir,"config.json"), "x")
+            sc.write("{}")
             sc.close()
         except FileExistsError:
             pass

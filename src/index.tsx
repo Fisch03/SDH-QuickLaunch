@@ -14,6 +14,8 @@ import { VFC, useState } from "react";
 import { FaRocket } from "react-icons/fa";
 
 import { App } from "./apptypes";
+import { Settings } from "./settings";
+import { GridDBPanel } from "./steamgriddb";
 import { fetchApps, launchApp, createShortcut, setLaunchOptions } from "./utils";
 
 let appList: App[] = [];
@@ -21,34 +23,32 @@ let appList: App[] = [];
 const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   const [dropdownOptions, setDropdownOptions] = useState<DropdownOption[]>([]);
   const [selectedApp, setSelectedApp] = useState<number | null>(null);
-  const [createNewShortcut, setCreateNewShortcut] = useState(false);
+
+  const [settings] = useState<Settings>(new Settings(serverAPI))
+
   const [buttonText, setButtonText] = useState<string>();
+  const updateButtonText = () => settings.get("createNewShortcut")? setButtonText("Create!") : setButtonText("Launch!");
+
+  const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
+  const [initialKeyValue, setInitialKeyValue] = useState<string>("");
 
   useLayoutEffect(() => {
-    (async () => {
-      appList = await fetchApps(serverAPI);
-      setDropdownOptions(appList.map((a, i) => {return { data: i, label: a.name } as DropdownOption}));
-      /*showContextMenu(
-        <Menu label="Menu" cancelText="Plugin Menu" onCancel={() => {}}>
-          {
-            appList.map((app, i) => (
-              <MenuItem onSelected={() => setSelectedApp(i)}>{app.name}</MenuItem>
-            ))
-          }
-        </Menu>
-      )*/
-    })();
+    fetchApps(serverAPI).then(appList => {
+      setDropdownOptions(appList.map((a, i) => {return { data: i, label: a.name }}));
+    });
+
+    settings.readSettings().then(() => {
+      updateButtonText();
+      setShowKeyInput(settings.get("useGridDB"));
+      setInitialKeyValue(settings.get("gridDBKey"));
+    });
   }, []);
-
-  useLayoutEffect(() => {
-    createNewShortcut? setButtonText("Create!") : setButtonText("Launch!");
-  }, [createNewShortcut]);
 
   function doButtonAction() {
     if(selectedApp === null) return;
 
     let app = appList[selectedApp];
-    if(createNewShortcut) {
+    if(settings.get("createNewShortcut")) {
       createShortcut(app.name).then((id:number) => setLaunchOptions(id, app))
     } else {
       launchApp(serverAPI, app);
@@ -76,8 +76,22 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
         <PanelSectionRow>
           <Toggle
             label="Add as a separate Shortcut"
-            checked={createNewShortcut}
-            onChange={(e) => setCreateNewShortcut(e)}
+            checked={settings.get("createNewShortcut")}
+            onChange={(e) => {settings.set("createNewShortcut", e); updateButtonText()}}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <Toggle
+            label="Automatically download Artworks from SteamGridDB"
+            checked={settings.get("useGridDB")}
+            onChange={(e) => {settings.set("useGridDB", e); setShowKeyInput(e)}}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <GridDBPanel 
+            enabled={showKeyInput} 
+            initialKey={initialKeyValue}
+            onUpdate={(key) => {settings.set("gridDBKey", key);}}
           />
         </PanelSectionRow>
       </PanelSection>
