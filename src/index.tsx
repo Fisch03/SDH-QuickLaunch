@@ -9,13 +9,13 @@ import {
   ButtonItem,
   Toggle
 } from "decky-frontend-lib";
-import { Fragment, useLayoutEffect } from "react";
+import { Fragment, useEffect } from "react";
 import { VFC, useState } from "react";
 import { FaRocket } from "react-icons/fa";
 
 import { App } from "./apptypes";
 import { Settings } from "./settings";
-import { GridDBPanel } from "./steamgriddb";
+import { GridDBPanel, getImagesForGame } from "./steamgriddb";
 import { fetchApps, launchApp, createShortcut, setLaunchOptions } from "./utils";
 
 let appList: App[] = [];
@@ -30,17 +30,17 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   const updateButtonText = () => settings.get("createNewShortcut")? setButtonText("Create!") : setButtonText("Launch!");
 
   const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
-  const [initialKeyValue, setInitialKeyValue] = useState<string>("");
 
-  useLayoutEffect(() => {
-    fetchApps(serverAPI).then(appList => {
-      setDropdownOptions(appList.map((a, i) => {return { data: i, label: a.name }}));
+  useEffect(() => {
+    fetchApps(serverAPI).then(list => {
+      appList = list;
+      setDropdownOptions(list.map((a, i) => {return { data: i, label: a.name }}));
     });
 
     settings.readSettings().then(() => {
       updateButtonText();
       setShowKeyInput(settings.get("useGridDB"));
-      setInitialKeyValue(settings.get("gridDBKey"));
+      //setKeyInputValue(settings.get("gridDBKey"));
     });
   }, []);
 
@@ -49,7 +49,24 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 
     let app = appList[selectedApp];
     if(settings.get("createNewShortcut")) {
-      createShortcut(app.name).then((id:number) => setLaunchOptions(id, app))
+      createShortcut(app.name).then((id:number) => {
+        if(settings.get("useGridDB")) {
+          getImagesForGame(serverAPI, settings.get("gridDBKey"),app.name).then(images => {
+            //@ts-ignore
+            if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Grid, "png", 0);
+            //@ts-ignore
+            if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Hero, "png", 1);
+            //@ts-ignore
+            if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Logo, "png", 2);
+            //@ts-ignore
+            //if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.GridH, "png", 3);
+          })
+        }
+
+        setTimeout(() => {
+          setLaunchOptions(id, app);
+        }, 500)
+      })
     } else {
       launchApp(serverAPI, app);
     }
@@ -89,9 +106,9 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
         </PanelSectionRow>
         <PanelSectionRow>
           <GridDBPanel 
-            enabled={showKeyInput} 
-            initialKey={initialKeyValue}
-            onUpdate={(key) => {settings.set("gridDBKey", key);}}
+            enabled={showKeyInput}
+            key={settings.get("gridDBKey")}
+            updateKey={(key) => {settings.set("gridDBKey", key)}}
           />
         </PanelSectionRow>
       </PanelSection>

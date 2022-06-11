@@ -47,7 +47,6 @@ export const setLaunchOptions = (scID: number, app: App) =>{
        launchOptions = `run ${app.package}`
     }
 
-    console.log(scID)
     //@ts-ignore
     SteamClient.Apps.SetShortcutLaunchOptions(scID, launchOptions); //This does not apply immediately and also cannot be awaited!
 }

@@ -33,5 +33,6 @@ export default defineConfig({
     },
     format: 'iife',
     exports: 'default',
+    inlineDynamicImports: true,
   },
 });

@@ -48,7 +48,7 @@ export class Settings {
     });
   }
 
-  writeChange(key: string, value: any) {
+  private writeChange(key: string, value: any) {
     this.sAPI.callPluginMethod<any, Settings>("set_config_value", {key: key, value: value});
   }
 }
