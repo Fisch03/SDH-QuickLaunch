@@ -1,3 +1,5 @@
+## THIS PLUGIN IS CURRENTLY BROKEN - MORE INFO [HERE](https://github.com/Fisch03/SDH-QuickLaunch/issues/4)
+
 # SDH-QuickLaunch
 [Steam Deck Plugin Loader](https://github.com/SteamDeckHomebrew/PluginLoader) Plugin to Quickly Launch Apps from the Steam Deck Quick Access Menu without adding them as Shortcuts
 
