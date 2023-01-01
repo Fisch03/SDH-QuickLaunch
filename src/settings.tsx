@@ -9,6 +9,8 @@ export class Settings {
   private useGridDB: boolean = false;
   //@ts-ignore
   private gridDBKey: string = "";
+  //@ts-ignore
+  private enableAll: boolean = false;
 
   constructor(sAPI: ServerAPI, startingSettings: Settings = {} as Settings) {
     this.sAPI = sAPI;
