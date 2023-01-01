@@ -78,8 +78,11 @@ export class GridDBPanel extends Component<{ enabled: boolean, key: string, upda
 
 function apiRequest(sAPI: ServerAPI, key:string, endpoint: string, data: string | number) {
   return new Promise<APIResponse>((resolve, reject) => {
-    sAPI.callPluginMethod<any, APIResponse>("get_req_json", {url: `https://www.steamgriddb.com/api/v2${endpoint}/${data}`, auth: key})
-    .then(data => {resolve(data.result as APIResponse)})
+    sAPI.callPluginMethod<any, APIResponse>("get_req_json", {url: `https://www.steamgriddb.com/api/v2${endpoint}/${encodeURIComponent(data)}`, auth: key})
+    .then(res => {
+      if(!(res.result as APIResponse).success) reject(res.result);
+      resolve(res.result as APIResponse)
+    })
     .catch(err => reject(err))
   })
 }
@@ -118,11 +121,13 @@ export function getImagesForGame(sAPI: ServerAPI, key: string, gameName: string)
   return new Promise<ImageCollection>((resolve, reject) => {
     searchGame(sAPI, key, gameName)
       .then(res => {
+        if(!res.data[0]) reject("No results found");
         let id: number = res.data[0].id;
         let images: ImageCollection = {Grid: null, Hero: null, Logo: null, GridH: null};
 
         getGrids(sAPI, key, id)
         .then(res => downloadImageB64(sAPI, res.data[0].url))
+        
         .then(img => {
           images.Grid = img;
           return getHeroes(sAPI, key, id)
@@ -137,8 +142,8 @@ export function getImagesForGame(sAPI: ServerAPI, key: string, gameName: string)
           images.Logo = img;
           resolve(images);
         })
-        .catch(err => { reject(err); })
+        .catch(err => reject(err))
       })
-      .catch(err => { reject(err); })
+      .catch(err => reject(err))
   })
 }

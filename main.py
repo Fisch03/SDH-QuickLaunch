@@ -14,7 +14,16 @@ def split_string(string):
 
 class Plugin:
     async def get_flatpaks(self):
-        proc = Popen('flatpak list -d --app | awk  \'BEGIN {FS="\\t"} {print "{\\"name\\":\\""$1"\\",\\"package\\":\\""$3"\\"},"}\\\'', stdout=PIPE, stderr=None, shell=True)
+        proc = Popen('flatpak list -d --app | awk  \'BEGIN {FS="\\t"} {print "{\\"name\\":\\""$1"\\",\\"exec\\":\\"/usr/bin/flatpak run "$3"\\"},"}\\\'', stdout=PIPE, stderr=None, shell=True)
+        packages = proc.communicate()[0]
+        packages = packages.decode("utf-8")
+        packages = packages[:-2]
+        return "["+packages+"]"
+
+    async def get_desktops(self):
+        #Really REALLY scuffed way of reading desktop files. Should probably be changed
+        proc = Popen('ls -l /usr/share/applications | awk \'{path="/usr/share/applications/"$9; while(( getline line<path) > 0) {if(line ~ /^Exec=/ && exec=="") { exec=substr(line,6) }; if(line ~ /^Name=/ && name=="") { name=substr(line,6) }; if(exec!="" && name!="") { break }};print("{\\"name\\":\\""name"\\",\\"exec\\":\\""exec"\\"},");exec="";name=""}\'', stdout=PIPE, stderr=None, shell=True)
+        
         packages = proc.communicate()[0]
         packages = packages.decode("utf-8")
         packages = packages[:-2]

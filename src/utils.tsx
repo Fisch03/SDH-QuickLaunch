@@ -1,10 +1,10 @@
 import { ServerAPI } from "decky-frontend-lib";
 
-import { App, FlatpakApp, isFlatpak } from "./apptypes";
+import { App, getLaunchOptions, getTarget } from "./apptypes";
 
 export const createShortcut = (name: string) => {
     //@ts-ignore
-    let id:Promise<number> = SteamClient.Apps.AddShortcut(name,"/usr/bin/flatpak")
+    let id:Promise<number> = SteamClient.Apps.AddShortcut(name,"/usr/bin/ifyouseethisyoufoundabug") //The Part after the last Slash does not matter because it should always be replaced when launching an app
     return id
 }
 
@@ -19,20 +19,23 @@ export const gameIDFromAppID = (appid: number) => {
     }
 }
 
-export const fetchApps = async (sAPI: ServerAPI): Promise<App[]> => {
-    const result = await sAPI.callPluginMethod<any, any>("get_flatpaks", {}); 
-    let flatpaks: FlatpakApp[] = []
+export async function fetchApps(sAPI: ServerAPI, type: string): Promise<App[]> {
+    const result = await sAPI.callPluginMethod<any, string>(`get_${type}`, {}); 
+    let apps: App[] = []
     if(result.success) {
-        flatpaks = JSON.parse(result.result);
+        apps = JSON.parse(result.result);
     }
 
-    return [...flatpaks]
+    return apps
   }
   
 export const launchApp = async (sAPI: ServerAPI, app: App) => {
     let id: number = await getShortcutID(sAPI);       
     
-    setLaunchOptions(id, app);
+    //@ts-ignore
+    SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app))
+    //@ts-ignore
+    SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`)
 
     setTimeout(() => {
         let gid = gameIDFromAppID(id);
@@ -40,16 +43,6 @@ export const launchApp = async (sAPI: ServerAPI, app: App) => {
         SteamClient.Apps.RunGame(gid,"",-1,100);
     }, 500)
   }
-
-export const setLaunchOptions = (scID: number, app: App) =>{
-    let launchOptions: string = ""      
-    if(isFlatpak(app)) {
-       launchOptions = `run ${app.package}`
-    }
-
-    //@ts-ignore
-    SteamClient.Apps.SetShortcutLaunchOptions(scID, launchOptions); //This does not apply immediately and also cannot be awaited!
-}
 
 export const getShortcutID = async (sAPI: ServerAPI) => {
     const result = await sAPI.callPluginMethod<any, number>("get_id", {})
