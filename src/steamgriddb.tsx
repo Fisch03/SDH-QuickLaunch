@@ -1,6 +1,13 @@
 import { ButtonItem, ModalRoot, ServerAPI, showModal, TextField } from "decky-frontend-lib";
 import { Component } from "react";
 
+interface HTMLResponse {
+  status: number,
+  headers: any,
+  body: string;
+  blob: () => Promise<Blob>;
+}
+
 interface APIResponse {
   success: boolean
 }
@@ -78,17 +85,27 @@ export class GridDBPanel extends Component<{ enabled: boolean, key: string, upda
 
 function apiRequest(sAPI: ServerAPI, key:string, endpoint: string, data: string | number) {
   return new Promise<APIResponse>((resolve, reject) => {
-    sAPI.callPluginMethod<any, APIResponse>("get_req_json", {url: `https://www.steamgriddb.com/api/v2${endpoint}/${encodeURIComponent(data)}`, auth: key})
-    .then(res => {
-      if(!(res.result as APIResponse).success) reject(res.result);
-      resolve(res.result as APIResponse)
+    sAPI.fetchNoCors<HTMLResponse>(`https://www.steamgriddb.com/api/v2${endpoint}/${encodeURIComponent(data)}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${key}`,
+        "User-Agent": "SDH-QuickLaunch",
+        "Content-Type": "application/json"
+      }
     })
-    .catch(err => reject(err))
+    .then(res => {
+      if(res.success) {
+        resolve(JSON.parse(res.result.body))
+      } else {
+        reject(res.result)
+      }
+    })
   })
 }
 
 function downloadImageB64(sAPI: ServerAPI, url: string) {
   return new Promise<any>((resolve, reject) => { 
+    console.log(url)
     sAPI.callPluginMethod<any, ImageChunk>("get_req_imgb64", {url: url})
     .then(async (res) => {
       if(!res.success) reject(res.result); 

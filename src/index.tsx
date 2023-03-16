@@ -7,9 +7,10 @@ import {
   PanelSection,
   PanelSectionRow,
   ButtonItem,
-  Toggle,
+  ToggleField,
   showModal,
   ModalRoot,
+  SingleDropdownOption,
   DropdownOption
 } from "decky-frontend-lib";
 import { Fragment, useEffect } from "react";
@@ -24,7 +25,7 @@ import { fetchApps, launchApp, createShortcut } from "./utils";
 let appList: App[] = [];
 
 const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
-  const [dropdownOptions, setDropdownOptions] = useState<MultiDropdownOption[] | DropdownOption[]>([]);
+  const [dropdownOptions, setDropdownOptions] = useState<DropdownOption[]>([]);
   const [selectedApp, setSelectedApp] = useState<number | null>(null);
 
   const [settings] = useState<Settings>(new Settings(serverAPI))
@@ -35,7 +36,8 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
 
   useEffect(() => {
-    buildAppList();
+    if(dropdownOptions.length === 0 || appList.length === 0) 
+      buildAppList();
 
     settings.readSettings().then(() => {
       updateButtonText();
@@ -45,7 +47,9 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   }, []);
 
   function buildAppList() {
+    appList = [];
     if(settings.get("enableAll")) {
+      console.log("Fetching all apps");
       let newDropdownOptions: MultiDropdownOption[] = [];
 
       fetchApps(serverAPI, "flatpaks")
@@ -56,6 +60,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       .then(list => {
         newDropdownOptions.push(createSubcategory(".desktop files", list));
         setDropdownOptions(newDropdownOptions);
+        console.log(newDropdownOptions);
       });
     } else {
       fetchApps(serverAPI, "flatpaks")
@@ -71,8 +76,8 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 
     return {
       label: categoryName,
-      options: list.map((a, i) => {return { data: i + appList.length- list.length, label: a.name }})
-    }
+      options: list.map((a, i) => {return { data: i + appList.length- list.length, label: a.name } as SingleDropdownOption})
+    } as MultiDropdownOption;
     
   }
 
@@ -83,24 +88,20 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     if(settings.get("createNewShortcut")) {
       createShortcut(app.name).then((id:number) => {
         if(settings.get("useGridDB")) {
+          console.log("Using GridDB");
           getImagesForGame(serverAPI, settings.get("gridDBKey"),app.name)
           .then(images => {
-            //@ts-ignore
+            console.log(images);
             if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Grid, "png", 0);
-            //@ts-ignore
-            if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Hero, "png", 1);
-            //@ts-ignore
-            if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Logo, "png", 2);
-            //@ts-ignore
+            if(images.Hero !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Hero, "png", 1);
+            if(images.Logo !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Logo, "png", 2);
             //if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.GridH, "png", 3);
           })
           .catch(() => {}); //Maybe display error to the user in the future?
         }
 
         setTimeout(() => {
-          //@ts-ignore
           SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app));
-          //@ts-ignore
           SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`);
         }, 500)
       })
@@ -117,7 +118,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
             strDefaultLabel="Select App..."
             rgOptions={dropdownOptions}
             selectedOption={selectedApp}
-            onChange={(data) => setSelectedApp(data.data)}
+            onChange={(e: SingleDropdownOption) => {setSelectedApp(e.data);}}
           />
         </PanelSectionRow>
         <PanelSectionRow>
@@ -128,14 +129,14 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       </PanelSection>
       <PanelSection title="Settings">
         <PanelSectionRow>
-          <Toggle
+          <ToggleField
             label="Add as a separate Shortcut"
             checked={settings.get("createNewShortcut")}
             onChange={(e) => {settings.set("createNewShortcut", e); updateButtonText()}}
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <Toggle
+          <ToggleField
             label="Automatically download Artworks from SteamGridDB"
             checked={settings.get("useGridDB")}
             onChange={(e) => {settings.set("useGridDB", e); setShowKeyInput(e)}}
@@ -149,7 +150,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <Toggle
+          <ToggleField
             label="Enable Launching all Apps"
             checked={settings.get("enableAll")}
             onChange={(e) => {
@@ -160,7 +161,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
                     bAllowFullSize={true}
                   >
                     Warning: Launching some Applications will temporarily break the ability to start <b>any</b> Shortcut from the Steam Deck UI.<br />
-                    If that happens hold down the Power Button and hit "Restart Steam Client". This is a bug within the Steam Deck and unfortunately cannot be circumvented on my side.<br />
+                    If that happens hold down the Power Button and hit "Restart Steam". This is a bug within the Steam Deck and unfortunately cannot be circumvented on my side.<br />
                     <br />
                     By continuing, you acknowledge to have read this Warning. Thanks for reading and have fun!
                   </ModalRoot>
@@ -181,5 +182,6 @@ export default definePlugin((serverApi: ServerAPI) => {
     title: <div className={staticClasses.Title}>SDH-QuickLaunch</div>,
     content: <Content serverAPI={serverApi} />,
     icon: <FaRocket />,
+    alwaysRender: true,
   };
 });

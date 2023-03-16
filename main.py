@@ -1,11 +1,14 @@
-import os, json, base64
+import os, json, base64, ssl, certifi
+
+import decky_plugin
 
 from subprocess import Popen, PIPE
 
 from urllib.error import HTTPError
 from urllib.request import urlopen, Request
 
-confdir = "/home/deck/.config/SDH-QuickLaunch/"
+
+confdir = os.environ['DECKY_PLUGIN_SETTINGS_DIR']
 
 send_buffer = []
 
@@ -21,8 +24,8 @@ class Plugin:
         return "["+packages+"]"
 
     async def get_desktops(self):
-        #Really REALLY scuffed way of reading desktop files. Should probably be changed
-        proc = Popen('ls -l /usr/share/applications | awk \'{path="/usr/share/applications/"$9; while(( getline line<path) > 0) {if(line ~ /^Exec=/ && exec=="") { exec=substr(line,6) }; if(line ~ /^Name=/ && name=="") { name=substr(line,6) }; if(exec!="" && name!="") { break }};print("{\\"name\\":\\""name"\\",\\"exec\\":\\""exec"\\"},");exec="";name=""}\'', stdout=PIPE, stderr=None, shell=True)
+        #Really REALLY scuffed way of reading desktop files...
+        proc = Popen('ls -l /usr/share/applications | gawk \'{path="/usr/share/applications/"$9; while(( getline line<path) > 0) {if(line ~ /^Exec=/ && exec=="") { exec=substr(line,6);}; if(line ~ /^Name=/ && name=="") { name=substr(line,6); }; if(exec!="" && name!="") { break }};gsub(/"/,"\\\\\\"",exec);print("{\\"name\\":\\""name"\\",\\"exec\\":\\""exec"\\"},");exec="";name=""}\'', stdout=PIPE, stderr=None, shell=True)
         
         packages = proc.communicate()[0]
         packages = packages.decode("utf-8")
@@ -52,34 +55,23 @@ class Plugin:
         with open(os.path.join(confdir,"scid.txt"), "w") as sc:
             sc.write(str(id))
 
-    async def get_req_json(self, url, auth):
-        req = Request(url)
-        req.add_header("User-Agent", "SDH-QuickLaunch")
-        req.add_header("Authorization", "Bearer "+auth)
-
-        try:
-            content = urlopen(req).read()
-            content = content.decode('utf-8')
-            content = json.loads(content)
-            return content
-        except HTTPError:
-            pass
-
     async def get_req_imgb64(self, url):
         global send_buffer
         if(len(send_buffer) != 0):
             return
 
         req = Request(url)
+
         req.add_header("User-Agent", "SDH-QuickLaunch")
 
         try:
-            content = urlopen(req).read()
+            content = urlopen(req, context=ssl.create_default_context(cafile=certifi.where())).read()
             img = base64.b64encode(content).decode('ascii')
             send_buffer = split_string(img)
             new_chunk = send_buffer.pop(0)
             return {"data": new_chunk, "is_last": len(send_buffer) == 0}   
         except HTTPError:
+            decky_plugin.logger.error("HTTPError while requesting "+url)
             pass
 
     async def receive_next_chunk(self):
@@ -104,3 +96,6 @@ class Plugin:
             sc.close()
         except FileExistsError:
             pass
+
+    async def _unload(self):
+        pass

@@ -4,8 +4,7 @@ import { App, getLaunchOptions, getTarget } from "./apptypes";
 
 export const createShortcut = (name: string) => {
     //@ts-ignore
-    let id:Promise<number> = SteamClient.Apps.AddShortcut(name,"/usr/bin/ifyouseethisyoufoundabug") //The Part after the last Slash does not matter because it should always be replaced when launching an app
-    return id
+    return SteamClient.Apps.AddShortcut(name,"/usr/bin/ifyouseethisyoufoundabug") //The Part after the last Slash does not matter because it should always be replaced when launching an app
 }
 
 export const gameIDFromAppID = (appid: number) => {
@@ -23,7 +22,20 @@ export async function fetchApps(sAPI: ServerAPI, type: string): Promise<App[]> {
     const result = await sAPI.callPluginMethod<any, string>(`get_${type}`, {}); 
     let apps: App[] = []
     if(result.success) {
-        apps = JSON.parse(result.result);
+        let apps_withDuplicates: App[] = JSON.parse(result.result);
+
+        let names: String[] = []
+        for(let app of apps_withDuplicates) {
+            if(!names.includes(app.name)) {
+                names.push(app.name)
+            }
+        }
+        for(let name of names) {
+            let app = apps_withDuplicates.find(app => app.name === name);
+            if(app !== undefined) {
+                apps.push(app);
+            }
+        }
     }
 
     return apps
