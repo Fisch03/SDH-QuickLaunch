@@ -1,6 +1,6 @@
 {
   "name": "sdh-quicklaunch",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Quickly Launch Apps from the Steam Deck Quick Access Menu without adding them as Shortcuts",
   "scripts": {
     "build": "shx rm -rf dist && rollup -c",
