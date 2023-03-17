@@ -22,11 +22,12 @@ export async function fetchApps(sAPI: ServerAPI, type: string): Promise<App[]> {
     const result = await sAPI.callPluginMethod<any, string>(`get_${type}`, {}); 
     let apps: App[] = []
     if(result.success) {
+        //...i guess it works
         let apps_withDuplicates: App[] = JSON.parse(result.result);
 
         let names: String[] = []
         for(let app of apps_withDuplicates) {
-            if(!names.includes(app.name)) {
+            if(!names.includes(app.name) && app.name !== "") {
                 names.push(app.name)
             }
         }
@@ -36,6 +37,12 @@ export async function fetchApps(sAPI: ServerAPI, type: string): Promise<App[]> {
                 apps.push(app);
             }
         }
+
+        apps.sort((a, b) => { 
+            if(a.name < b.name) { return -1; }
+            if(a.name > b.name) { return 1; }
+            return 0;
+        })
     }
 
     return apps

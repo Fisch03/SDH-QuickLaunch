@@ -30,16 +30,15 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 
   const [settings] = useState<Settings>(new Settings(serverAPI))
 
-  const [buttonText, setButtonText] = useState<string>();
+  const [buttonText, setButtonText] = useState<string>("Launch!");
   const updateButtonText = () => settings.get("createNewShortcut")? setButtonText("Create!") : setButtonText("Launch!");
 
   const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
 
   useEffect(() => {
-    if(dropdownOptions.length === 0 || appList.length === 0) 
-      buildAppList();
-
     settings.readSettings().then(() => {
+      if(dropdownOptions.length === 0 || appList.length === 0) 
+        buildAppList();
       updateButtonText();
       setShowKeyInput(settings.get("useGridDB"));
       //setKeyInputValue(settings.get("gridDBKey"));
@@ -47,28 +46,26 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   }, []);
 
   function buildAppList() {
-    appList = [];
-    if(settings.get("enableAll")) {
-      console.log("Fetching all apps");
-      let newDropdownOptions: MultiDropdownOption[] = [];
+      appList = [];
+      if(settings.get("enableAll")) {
+        let newDropdownOptions: MultiDropdownOption[] = [];
 
-      fetchApps(serverAPI, "flatpaks")
-      .then(list => {
-        newDropdownOptions.push(createSubcategory("Flatpaks", list));
-        return fetchApps(serverAPI, "desktops");
-      })
-      .then(list => {
-        newDropdownOptions.push(createSubcategory(".desktop files", list));
-        setDropdownOptions(newDropdownOptions);
-        console.log(newDropdownOptions);
-      });
-    } else {
-      fetchApps(serverAPI, "flatpaks")
-      .then(list => {
-        setDropdownOptions(createSubcategory("Flatpaks", list).options)
-        appList = list
-      })
-    }
+        fetchApps(serverAPI, "flatpaks")
+        .then(list => {
+          newDropdownOptions.push(createSubcategory("Flatpaks", list));
+          return fetchApps(serverAPI, "desktops");
+        })
+        .then(list => {
+          newDropdownOptions.push(createSubcategory(".desktop files", list));
+          setDropdownOptions(newDropdownOptions);
+        });
+      } else {
+        fetchApps(serverAPI, "flatpaks")
+        .then(list => {
+          setDropdownOptions(createSubcategory("Flatpaks", list).options)
+          appList = list
+        })
+      }
   }
 
   function createSubcategory(categoryName: string, list: App[]) {
@@ -88,10 +85,8 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     if(settings.get("createNewShortcut")) {
       createShortcut(app.name).then((id:number) => {
         if(settings.get("useGridDB")) {
-          console.log("Using GridDB");
           getImagesForGame(serverAPI, settings.get("gridDBKey"),app.name)
           .then(images => {
-            console.log(images);
             if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Grid, "png", 0);
             if(images.Hero !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Hero, "png", 1);
             if(images.Logo !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Logo, "png", 2);
@@ -160,7 +155,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
                   <ModalRoot
                     bAllowFullSize={true}
                   >
-                    Warning: Launching some Applications will temporarily break the ability to start <b>any</b> Shortcut from the Steam Deck UI.<br />
+                    Warning: Launching some Applications will temporarily break the ability to start any Shortcut from the Steam Deck UI.<br />
                     If that happens hold down the Power Button and hit "Restart Steam". This is a bug within the Steam Deck and unfortunately cannot be circumvented on my side.<br />
                     <br />
                     By continuing, you acknowledge to have read this Warning. Thanks for reading and have fun!

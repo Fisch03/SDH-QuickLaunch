@@ -97,5 +97,7 @@ class Plugin:
         except FileExistsError:
             pass
 
+        decky_plugin.logger.info("Plugin loaded")
+
     async def _unload(self):
         pass

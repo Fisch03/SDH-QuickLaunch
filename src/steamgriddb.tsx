@@ -105,7 +105,6 @@ function apiRequest(sAPI: ServerAPI, key:string, endpoint: string, data: string 
 
 function downloadImageB64(sAPI: ServerAPI, url: string) {
   return new Promise<any>((resolve, reject) => { 
-    console.log(url)
     sAPI.callPluginMethod<any, ImageChunk>("get_req_imgb64", {url: url})
     .then(async (res) => {
       if(!res.success) reject(res.result); 
