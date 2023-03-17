@@ -80,6 +80,8 @@ class Plugin:
         return {"data": new_chunk, "is_last": len(send_buffer) == 0}
 
     async def _main(self):
+        decky_plugin.logger.info("Loading plugin")
+        
         try:
             os.mkdir(confdir)
         except FileExistsError:
