@@ -5,6 +5,7 @@
     "publish": {
         "discord_id": "431374517462499328",
         "description": "Quickly Launch Non-Steam-Apps from the Quick Access menu without adding them as Shortcuts, or add them to the Steam Library.",
-        "tags": [ "utility" ]
+        "tags": [ "utility" ],
+        "image": "https://github.com/Fisch03/SDH-QuickLaunch/blob/master/ui.png"
     }    
 }
