@@ -6,12 +6,12 @@ import {
   MultiDropdownOption,
   PanelSection,
   PanelSectionRow,
-  ButtonItem,
   ToggleField,
   showModal,
   ModalRoot,
   SingleDropdownOption,
-  DropdownOption
+  DropdownOption,
+  DialogButton
 } from "decky-frontend-lib";
 import { Fragment, useEffect } from "react";
 import { VFC, useState } from "react";
@@ -30,18 +30,13 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 
   const [settings] = useState<Settings>(new Settings(serverAPI))
 
-  const [buttonText, setButtonText] = useState<string>("Launch!");
-  const updateButtonText = () => settings.get("createNewShortcut")? setButtonText("Create!") : setButtonText("Launch!");
-
   const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
 
   useEffect(() => {
     settings.readSettings().then(() => {
       if(dropdownOptions.length === 0 || appList.length === 0) 
         buildAppList();
-      updateButtonText();
       setShowKeyInput(settings.get("useGridDB"));
-      //setKeyInputValue(settings.get("gridDBKey"));
     });
   }, []);
 
@@ -78,31 +73,27 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     
   }
 
-  function doButtonAction() {
+  function newShortcut() {
     if(selectedApp === null) return;
 
     let app = appList[selectedApp];
-    if(settings.get("createNewShortcut")) {
-      createShortcut(app.name).then((id:number) => {
-        if(settings.get("useGridDB")) {
-          getImagesForGame(serverAPI, settings.get("gridDBKey"),app.name)
-          .then(images => {
-            if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Grid, "png", 0);
-            if(images.Hero !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Hero, "png", 1);
-            if(images.Logo !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Logo, "png", 2);
-            //if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.GridH, "png", 3);
-          })
-          .catch(() => {}); //Maybe display error to the user in the future?
-        }
+    createShortcut(app.name).then((id:number) => {
+      if(settings.get("useGridDB")) {
+        getImagesForGame(serverAPI, settings.get("gridDBKey"),app.name)
+        .then(images => {
+          if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Grid, "png", 0);
+          if(images.Hero !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Hero, "png", 1);
+          if(images.Logo !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Logo, "png", 2);
+          //if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.GridH, "png", 3);
+        })
+        .catch(() => {}); //Maybe display error to the user in the future?
+      }
 
-        setTimeout(() => {
-          SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app));
-          SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`);
-        }, 500)
-      })
-    } else {
-      launchApp(serverAPI, app);
-    }
+      setTimeout(() => {
+        SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app));
+        SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`);
+      }, 500)
+    })
   }
 
   return (
@@ -117,19 +108,20 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <ButtonItem layout="below" onClick={() => doButtonAction()}>
-            {buttonText}
-          </ButtonItem>
+          <DialogButton style={{ marginTop: "8px" }} onClick={() => {
+            if(selectedApp === null) return;
+            launchApp(serverAPI, appList[selectedApp])
+          }}>
+            Launch!
+          </DialogButton>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <DialogButton style={{ marginTop: "8px" }} onClick={() => {newShortcut()}}>
+            Create Shortcut
+          </DialogButton>
         </PanelSectionRow>
       </PanelSection>
       <PanelSection title="Settings">
-        <PanelSectionRow>
-          <ToggleField
-            label="Add as a separate Shortcut"
-            checked={settings.get("createNewShortcut")}
-            onChange={(e) => {settings.set("createNewShortcut", e); updateButtonText()}}
-          />
-        </PanelSectionRow>
         <PanelSectionRow>
           <ToggleField
             label="Automatically download Artworks from SteamGridDB"
