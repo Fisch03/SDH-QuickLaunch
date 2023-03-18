@@ -3,7 +3,6 @@ import { ServerAPI } from "decky-frontend-lib";
 import { App, getLaunchOptions, getTarget } from "./apptypes";
 
 export const createShortcut = (name: string) => {
-    //@ts-ignore
     return SteamClient.Apps.AddShortcut(name,"/usr/bin/ifyouseethisyoufoundabug") //The Part after the last Slash does not matter because it should always be replaced when launching an app
 }
 
@@ -51,14 +50,12 @@ export async function fetchApps(sAPI: ServerAPI, type: string): Promise<App[]> {
 export const launchApp = async (sAPI: ServerAPI, app: App) => {
     let id: number = await getShortcutID(sAPI);       
     
-    //@ts-ignore
+    SteamClient.Apps.SetShortcutName(id, `[QL] ${app.name}`)
     SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app))
-    //@ts-ignore
     SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`)
 
     setTimeout(() => {
         let gid = gameIDFromAppID(id);
-        //@ts-ignore
         SteamClient.Apps.RunGame(gid,"",-1,100);
     }, 500)
   }

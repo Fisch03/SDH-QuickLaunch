@@ -129,9 +129,8 @@ const searchGame = (sAPI: ServerAPI, key: string, gameName: string) => apiReques
 const getGrids   = (sAPI: ServerAPI, key: string, gameID: number)   => apiRequest(sAPI, key, "/grids/game",          gameID)   as Promise<ImageAPIResponse>
 const getHeroes  = (sAPI: ServerAPI, key: string, gameID: number)   => apiRequest(sAPI, key, "/heroes/game",         gameID)   as Promise<ImageAPIResponse>
 const getLogos   = (sAPI: ServerAPI, key: string, gameID: number)   => apiRequest(sAPI, key, "/logos/game",          gameID)   as Promise<ImageAPIResponse>
+//const getIcons   = (sAPI: ServerAPI, key: string, gameID: number)   => apiRequest(sAPI, key, "/icons/game",          gameID)   as Promise<ImageAPIResponse>
 //const getGridH   = (sAPI: ServerAPI, key: string, gameID: number)   => apiRequest(sAPI, key, "/grids/game",          gameID)   as Promise<ImageAPIResponse>
-
-
 
 export function getImagesForGame(sAPI: ServerAPI, key: string, gameName: string): Promise<ImageCollection> {
   return new Promise<ImageCollection>((resolve, reject) => {
