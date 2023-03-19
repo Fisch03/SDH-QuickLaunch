@@ -44,7 +44,6 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   }, []);
 
   function buildAppList() {
-    console.log("Building app list");
     return new Promise<void>((resolve) => {
       let newDropdownOptions: DropdownOption[] = [];
       appList = [];
