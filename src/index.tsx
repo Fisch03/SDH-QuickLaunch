@@ -11,11 +11,12 @@ import {
   ModalRoot,
   SingleDropdownOption,
   DropdownOption,
-  DialogButton
+  DialogButton,
+  Focusable
 } from "decky-frontend-lib";
 import { Fragment, useEffect } from "react";
 import { VFC, useState } from "react";
-import { FaRocket } from "react-icons/fa";
+import { FaRocket, FaStar, FaRegStar } from "react-icons/fa";
 
 import { App, getLaunchOptions, getTarget } from "./apptypes";
 import { Settings } from "./settings";
@@ -32,6 +33,8 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
 
   const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
 
+  const [isStarred, setIsStarred] = useState<boolean>(false);
+
   useEffect(() => {
     settings.readSettings().then(() => {
       if(dropdownOptions.length === 0 || appList.length === 0) 
@@ -41,26 +44,48 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
   }, []);
 
   function buildAppList() {
+    console.log("Building app list");
+    return new Promise<void>((resolve) => {
+      let newDropdownOptions: DropdownOption[] = [];
       appList = [];
-      if(settings.get("enableAll")) {
-        let newDropdownOptions: MultiDropdownOption[] = [];
 
-        fetchApps(serverAPI, "flatpaks")
-        .then(list => {
-          newDropdownOptions.push(createSubcategory("Flatpaks", list));
-          return fetchApps(serverAPI, "desktops");
-        })
-        .then(list => {
-          newDropdownOptions.push(createSubcategory(".desktop files", list));
-          setDropdownOptions(newDropdownOptions);
+      let starredApps = settings.get("starredApps");
+
+      if(starredApps.length > 0)
+        newDropdownOptions.push(...createSubcategory("Starred Apps", settings.get("starredApps")).options);
+
+      fetchApps(serverAPI, "flatpaks")
+      .then(list => {
+        list = list.filter(app => {
+          for(let starredApp of starredApps) {
+            if(starredApp.name === app.name) return false;
+          }
+          return true;
         });
-      } else {
-        fetchApps(serverAPI, "flatpaks")
-        .then(list => {
-          setDropdownOptions(createSubcategory("Flatpaks", list).options)
-          appList = list
-        })
-      }
+
+        newDropdownOptions.push(createSubcategory("Flatpaks", list));
+        if(settings.get("enableAll")) {
+          return fetchApps(serverAPI, "desktops")
+        } else {
+          return Promise.resolve([]);
+        }
+      })
+      .then(list => {
+        if(list.length > 0) {
+          list = list.filter(app => {
+            for(let starredApp of starredApps) {
+              if(starredApp.name === app.name) return false;
+            }
+            return true;
+          });
+          newDropdownOptions.push(createSubcategory(".desktop files", list));
+        }
+      })
+      .finally(() => {
+        setDropdownOptions(newDropdownOptions);
+        resolve();
+      })
+    })
   }
 
   function createSubcategory(categoryName: string, list: App[]) {
@@ -100,12 +125,53 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     <Fragment>
       <PanelSection>
         <PanelSectionRow>
-          <Dropdown
-            strDefaultLabel="Select App..."
-            rgOptions={dropdownOptions}
-            selectedOption={selectedApp}
-            onChange={(e: SingleDropdownOption) => {setSelectedApp(e.data);}}
-          />
+          <Focusable flow-children="horizontal" style={{display: "flex", justifyContent: "space-between", padding: 0, gap: "8px"}}>
+            <div style={{flexGrow: 1}}>
+              <Dropdown
+                strDefaultLabel="Select App..."
+                rgOptions={dropdownOptions}
+                selectedOption={selectedApp}
+                onChange={(e: SingleDropdownOption) => {
+                  setIsStarred(e.data < settings.get("starredApps").length);
+                  setSelectedApp(e.data);
+                }}
+              />
+            </div>
+            
+            <DialogButton style={{minWidth: 0, width: "15%", padding: 0}} onClick={() => {
+                if(selectedApp === null) return;
+
+                let toBeStarred = appList[selectedApp];
+
+                setIsStarred(!isStarred);
+                let starredApps = settings.get("starredApps");
+                if(isStarred) {
+                  starredApps.splice(starredApps.indexOf(appList[selectedApp]), 1);
+                } else {
+                  starredApps.push(appList[selectedApp]);
+                }
+                settings.set("starredApps", starredApps);
+
+                buildAppList()
+                .then(() => {
+                  if(isStarred) {
+                    let foundApp = 0;
+                    for(let app of appList) {
+                      if(app.name === toBeStarred.name) {
+                        foundApp = appList.indexOf(app);
+                        break;
+                      }
+                    }
+
+                    setSelectedApp(foundApp);
+                  } else {
+                    setSelectedApp(starredApps.length-1);
+                  }
+                })
+              }}>
+              {isStarred ? <FaStar /> : <FaRegStar />}
+            </DialogButton>
+          </Focusable>
         </PanelSectionRow>
         <PanelSectionRow>
           <DialogButton style={{ marginTop: "8px" }} onClick={() => {

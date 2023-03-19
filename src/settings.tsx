@@ -11,6 +11,8 @@ export class Settings {
   private gridDBKey: string = "";
   //@ts-ignore
   private enableAll: boolean = false;
+  //@ts-ignore
+  private starredApps: App[] = [];
 
   constructor(sAPI: ServerAPI, startingSettings: Settings = {} as Settings) {
     this.sAPI = sAPI;
