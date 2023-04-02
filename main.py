@@ -47,12 +47,13 @@ class Plugin:
                 package = {}
                 foundName = foundExec = False
                 for line in f:
+                    line = line.strip()
                     if line.startswith("Name="):
                         foundName = True
-                        package["name"] = line.strip()[5:]
+                        package["name"] = line[5:]
                     elif line.startswith("Exec="):
                         foundExec = True
-                        package["exec"] = line.strip()[5:]
+                        package["exec"] = line[5:]
                     if foundName and foundExec:
                         packages.append(package)
                         break
