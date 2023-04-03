@@ -39,7 +39,7 @@ class Plugin:
         packages = []
         for desktopFile in chain(
             Path("/usr/share/applications").glob("*.desktop"),
-            Path("/home/deck/.local/share/applications/").glob("*.desktop"),
+            Path(f"{decky_plugin.DECKY_USER_HOME}/.local/share/applications/").glob("*.desktop"),
         ):
             if not desktopFile.is_file():
                 continue
