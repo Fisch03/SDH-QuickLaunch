@@ -18,30 +18,18 @@ export const gameIDFromAppID = (appid: number) => {
 }
 
 export async function fetchApps(sAPI: ServerAPI, type: string): Promise<App[]> {
-    const result = await sAPI.callPluginMethod<any, string>(`get_${type}`, {}); 
+    const result = await sAPI.callPluginMethod<any, string>(`get_${type}`, {});
     let apps: App[] = []
-    if(result.success) {
-        //...i guess it works
-        let apps_withDuplicates: App[] = JSON.parse(result.result);
-
-        let names: String[] = []
-        for(let app of apps_withDuplicates) {
-            if(!names.includes(app.name) && app.name !== "") {
-                names.push(app.name)
-            }
-        }
-        for(let name of names) {
-            let app = apps_withDuplicates.find(app => app.name === name);
-            if(app !== undefined) {
-                apps.push(app);
+    if (result.success) {
+        let appsDict = new Map<string, App>();
+        for (let app of JSON.parse(result.result)) {
+            if (app.name !== "" && !appsDict.has(app.name)) {
+                appsDict.set(app.name, app);
             }
         }
 
-        apps.sort((a, b) => { 
-            if(a.name < b.name) { return -1; }
-            if(a.name > b.name) { return 1; }
-            return 0;
-        })
+        // map values to list
+        apps = Array.from(appsDict.values()).sort((a, b) => a.name.localeCompare(b.name));
     }
 
     return apps
