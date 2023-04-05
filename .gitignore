@@ -1,5 +1,3 @@
-.vscode
-
 lib-cov
 *.seed
 *.log
@@ -15,9 +13,6 @@ logs
 results
 tmp
 
-# Build
-public/css/main.css
-
 # Coverage reports
 coverage
 
@@ -27,6 +22,7 @@ coverage
 # Dependency directory
 node_modules
 bower_components
+.pnpm-store
 
 # Editors
 .idea
@@ -39,5 +35,16 @@ Thumbs.db
 # Ignore built ts files
 dist/
 
-# ignore yarn.lock
-yarn.lock
+__pycache__/
+
+/.yalc
+yalc.lock
+
+.vscode/settings.json
+
+# Ignore output folder
+
+backend/out
+
+# Make sure to ignore any instance of the loader's decky_plugin.py
+decky_plugin.py
