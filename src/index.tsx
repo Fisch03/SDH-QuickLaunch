@@ -101,7 +101,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     if(selectedApp === null) return;
 
     let app = appList[selectedApp];
-    createShortcut(app.name).then((id:number) => {
+    createShortcut(app.name, getLaunchOptions(app), getTarget(app)).then((id:number) => {
       if(settings.get("useGridDB")) {
         getImagesForGame(serverAPI, settings.get("gridDBKey"),app.name)
         .then(images => {
@@ -113,7 +113,9 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
         .catch(() => {}); //Maybe display error to the user in the future?
       }
 
+      //This should teoretically not be needed with the new SteamClient.Apps.AddShortcut params but they seem to be pretty broken rn. It's not like it hurts either.
       setTimeout(() => {
+        SteamClient.Apps.SetShortcutName(id, app.name);
         SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app));
         SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`);
       }, 500)

@@ -2,8 +2,8 @@ import { ServerAPI } from "decky-frontend-lib";
 
 import { App, getLaunchOptions, getTarget } from "./apptypes";
 
-export const createShortcut = (name: string) => {
-    return SteamClient.Apps.AddShortcut(name,"/usr/bin/ifyouseethisyoufoundabug") //The Part after the last Slash does not matter because it should always be replaced when launching an app
+export const createShortcut = (name: string, launchOptions: string = "", target:string = "") => {
+    return SteamClient.Apps.AddShortcut(name,"/usr/bin/ifyouseethisyoufoundabug", target, launchOptions); //The Part after the last Slash does not matter because it should always be replaced when launching an app
 }
 
 export const gameIDFromAppID = (appid: number) => {

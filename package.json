@@ -1,6 +1,6 @@
 {
   "name": "sdh-quicklaunch",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Quickly Launch Apps from the Steam Deck Quick Access Menu without adding them as Shortcuts",
   "scripts": {
     "build": "shx rm -rf dist && rollup -c",
@@ -38,7 +38,7 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
-    "decky-frontend-lib": "^3.19.2",
+    "decky-frontend-lib": "^3.21.8",
     "react-icons": "^4.8.0"
   },
   "pnpm": {
