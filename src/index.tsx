@@ -12,7 +12,8 @@ import {
   SingleDropdownOption,
   DropdownOption,
   DialogButton,
-  Focusable
+  Focusable,
+  FileSelectionType
 } from "decky-frontend-lib";
 import { Fragment, useEffect } from "react";
 import { VFC, useState } from "react";
@@ -22,6 +23,7 @@ import { App, getLaunchOptions, getTarget } from "./apptypes";
 import { Settings } from "./settings";
 import { GridDBPanel, getImagesForGame } from "./steamgriddb";
 import { fetchApps, launchApp, createShortcut } from "./utils";
+import { ShortcutOptionsModal } from "./shortcutoptions";
 
 let appList: App[] = [];
 
@@ -97,11 +99,10 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     
   }
 
-  function newShortcut() {
-    if(selectedApp === null) return;
-
-    let app = appList[selectedApp];
-    createShortcut(app.name, getLaunchOptions(app), getTarget(app)).then((id:number) => {
+  function createAppShortcut(app: App, launchOptions?: string, target?:string, compatTool?: string) {
+    let shortcutLaunchOptions = launchOptions === undefined ? getLaunchOptions(app) : launchOptions
+    let shortcutTarget = target === undefined ? getTarget(app) : target
+    createShortcut(app.name, shortcutLaunchOptions, shortcutTarget).then((id:number) => {
       if(settings.get("useGridDB")) {
         getImagesForGame(serverAPI, settings.get("gridDBKey"),app.name)
         .then(images => {
@@ -118,8 +119,43 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
         SteamClient.Apps.SetShortcutName(id, app.name);
         SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app));
         SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`);
+        if (compatTool != null) SteamClient.Apps.SpecifyCompatTool(id, compatTool);
       }, 500)
     })
+  }
+
+  async function createFileShortcut() {
+    let lastUsedPath = localStorage.getItem('decky-addtosteam')
+    let deckyUserHome = (await serverAPI.callPluginMethod('get_DECKY_USER_HOME', {})).result
+    let path: string
+    if (lastUsedPath != null) {
+      path = lastUsedPath
+    } else if (typeof deckyUserHome === 'string') {
+      path = deckyUserHome
+    } else {
+      return
+    }
+    let filepath = await serverAPI.openFilePickerV2(
+      FileSelectionType.FILE,
+      path,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      true
+    )
+    if (!filepath) { return }
+
+    showModal(<ShortcutOptionsModal createAppShortcut={createAppShortcut} filepath={filepath} serverAPI={serverAPI}/>)
+  }
+
+  function newShortcut() {
+    if(selectedApp != null){
+      createAppShortcut(appList[selectedApp])
+    } else if (selectedApp === null && settings.get("enableAll")) {
+      createFileShortcut()
+    } else { return; }
   }
 
   return (

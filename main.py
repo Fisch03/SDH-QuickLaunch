@@ -60,6 +60,9 @@ class Plugin:
 
         return jsonDumps(packages)
 
+    async def get_DECKY_USER_HOME(self):
+        return decky_plugin.DECKY_USER_HOME
+
     async def get_config(self):
         with open(os.path.join(confdir, "config.json"), "r") as f:
             return json.load(f)
