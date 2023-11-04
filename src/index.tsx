@@ -19,11 +19,16 @@ import { Fragment, useEffect } from "react";
 import { VFC, useState } from "react";
 import { FaRocket, FaStar, FaRegStar } from "react-icons/fa";
 
-import { App, getLaunchOptions, getTarget } from "./apptypes";
+import { App } from "./apptypes";
 import { Settings } from "./settings";
-import { GridDBPanel, getImagesForGame } from "./steamgriddb";
-import { fetchApps, launchApp, createShortcut } from "./utils";
-import { ShortcutOptionsModal } from "./shortcutoptions";
+import { GridDBPanel } from "./steamgriddb";
+import { fetchApps } from "./utils";
+import { FileOptionsModal } from "./fileoptions";
+import { launchApp, createAppShortcut } from "./appoperations";
+
+enum SpecialSelections {
+  FileShortcut = -1,
+}
 
 let appList: App[] = [];
 
@@ -83,6 +88,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
         }
       })
       .finally(() => {
+        if(settings.get("enableAll")) newDropdownOptions.push({label: "Choose a file...", data: SpecialSelections.FileShortcut} as SingleDropdownOption);
         setDropdownOptions(newDropdownOptions);
         resolve();
       })
@@ -97,31 +103,6 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       options: list.map((a, i) => {return { data: i + appList.length- list.length, label: a.name } as SingleDropdownOption})
     } as MultiDropdownOption;
     
-  }
-
-  function createAppShortcut(app: App, launchOptions?: string, target?:string, compatTool?: string) {
-    let shortcutLaunchOptions = launchOptions === undefined ? getLaunchOptions(app) : launchOptions
-    let shortcutTarget = target === undefined ? getTarget(app) : target
-    createShortcut(app.name, shortcutLaunchOptions, shortcutTarget).then((id:number) => {
-      if(settings.get("useGridDB")) {
-        getImagesForGame(serverAPI, settings.get("gridDBKey"),app.name)
-        .then(images => {
-          if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Grid, "png", 0);
-          if(images.Hero !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Hero, "png", 1);
-          if(images.Logo !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Logo, "png", 2);
-          //if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.GridH, "png", 3);
-        })
-        .catch(() => {}); //Maybe display error to the user in the future?
-      }
-
-      //This should teoretically not be needed with the new SteamClient.Apps.AddShortcut params but they seem to be pretty broken rn. It's not like it hurts either.
-      setTimeout(() => {
-        SteamClient.Apps.SetShortcutName(id, app.name);
-        SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app));
-        SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`);
-        if (compatTool != null) SteamClient.Apps.SpecifyCompatTool(id, compatTool);
-      }, 500)
-    })
   }
 
   async function createFileShortcut() {
@@ -147,15 +128,23 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     )
     if (!filepath) { return }
 
-    showModal(<ShortcutOptionsModal createAppShortcut={createAppShortcut} filepath={filepath} serverAPI={serverAPI}/>)
+    const starApp = async (app: App) => {
+      let starredApps = settings.get("starredApps");
+      if(!starredApps.find((a: App) => a.name === app.name && a.exec === app.exec))
+      starredApps.push(app);
+      settings.set("starredApps", starredApps);
+
+      await buildAppList();
+      setSelectedApp(appList.findIndex((a: App) => a.name === app.name && a.exec === app.exec));
+    }
+
+    showModal(<FileOptionsModal filepath={filepath} starApp={starApp} settings={settings} serverAPI={serverAPI}/>)
   }
 
   function newShortcut() {
     if(selectedApp != null){
-      createAppShortcut(appList[selectedApp])
-    } else if (selectedApp === null && settings.get("enableAll")) {
-      createFileShortcut()
-    } else { return; }
+      createAppShortcut(serverAPI, appList[selectedApp], settings)
+    }
   }
 
   return (
@@ -170,7 +159,11 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
                 selectedOption={selectedApp}
                 onChange={(e: SingleDropdownOption) => {
                   setIsStarred(e.data < settings.get("starredApps").length);
-                  setSelectedApp(e.data);
+                  if(e.data === SpecialSelections.FileShortcut) {
+                    createFileShortcut();
+                    setSelectedApp(null);
+                  } 
+                  else setSelectedApp(e.data);
                 }}
               />
             </div>
