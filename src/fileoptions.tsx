@@ -38,11 +38,12 @@ export const FileOptionsModal = (props: {closeModal?: CallableFunction, settings
   const onOK = () => {
     let app: App = {
       name: appName,
-      exec: filepath.realpath
+      exec: filepath.realpath,
+      compatTool: compatTool
     }
 
     if (addAsShortcut) { 
-      createAppShortcut(serverAPI, app, settings, "", "", compatTool)
+      createAppShortcut(serverAPI, app, settings, "", app.exec)
 
       let toastData: ToastData = {
         title: 'Added Shortcut',
@@ -55,7 +56,7 @@ export const FileOptionsModal = (props: {closeModal?: CallableFunction, settings
       //TODO: Doing this looses information about the compat tool. An app should also be able to store data about compat tools.
       starApp(app);
     } else {
-      launchApp(serverAPI, app, compatTool);
+      launchApp(serverAPI, app);
     }
   }
 

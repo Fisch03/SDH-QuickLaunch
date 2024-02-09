@@ -4,13 +4,13 @@ import { getImagesForGame } from "./steamgriddb";
 import { gameIDFromAppID, getShortcutID, createShortcut } from "./utils";
 import { Settings } from "./settings";
 
-export async function launchApp(sAPI: ServerAPI, app: App, compatTool?: string) {
-  let id: number = await getShortcutID(sAPI);       
+export async function launchApp(sAPI: ServerAPI, app: App) {
+  let id: number = await getShortcutID(sAPI);
   
   SteamClient.Apps.SetShortcutName(id, `[QL] ${app.name}`)
   SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app))
   SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`)
-  SteamClient.Apps.SpecifyCompatTool(id, compatTool)
+  SteamClient.Apps.SpecifyCompatTool(id, app.compatTool === undefined ? "" : app.compatTool)
 
   setTimeout(() => {
       let gid = gameIDFromAppID(id);
@@ -18,9 +18,10 @@ export async function launchApp(sAPI: ServerAPI, app: App, compatTool?: string) 
   }, 500)
 }
 
-export function createAppShortcut(sAPI: ServerAPI, app: App, settings: Settings, launchOptions?: string, target?: string, compatTool?: string) {
+export function createAppShortcut(sAPI: ServerAPI, app: App, settings: Settings, launchOptions?: string, target?: string) {
   let shortcutLaunchOptions = launchOptions === undefined ? getLaunchOptions(app) : launchOptions
   let shortcutTarget = target === undefined ? getTarget(app) : target
+
   createShortcut(app.name, shortcutLaunchOptions, shortcutTarget).then((id:number) => {
     if(settings.get("useGridDB")) {
       getImagesForGame(sAPI, settings.get("gridDBKey") ,app.name)
@@ -36,9 +37,9 @@ export function createAppShortcut(sAPI: ServerAPI, app: App, settings: Settings,
     //This should theoretically not be needed with the new SteamClient.Apps.AddShortcut params but they seem to be pretty broken rn. It's not like it hurts either.
     setTimeout(() => {
       SteamClient.Apps.SetShortcutName(id, app.name);
-      SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app));
-      SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`);
-      if (compatTool != null) SteamClient.Apps.SpecifyCompatTool(id, compatTool);
+      SteamClient.Apps.SetShortcutLaunchOptions(id, shortcutLaunchOptions);
+      SteamClient.Apps.SetShortcutExe(id, `"${shortcutTarget}"`);
+      SteamClient.Apps.SpecifyCompatTool(id, app.compatTool === undefined ? "" : app.compatTool);
     }, 500)
   })
 }

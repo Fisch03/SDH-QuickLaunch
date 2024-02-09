@@ -1,6 +1,7 @@
 export interface App {
   name: string;
   exec: string;
+  compatTool?: string;
 }
 
 export function getLaunchOptions(app: App) {
