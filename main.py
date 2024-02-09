@@ -24,15 +24,20 @@ def split_string(string):
 
 class Plugin:
     async def get_flatpaks(self):
-        proc = Popen(
-            'flatpak list --app --columns="name,application" | awk  \'BEGIN {FS="\\t"} {print "{\\"name\\":\\""$1"\\",\\"exec\\":\\"/usr/bin/flatpak run "$2"\\"},"}\\\'',
-            stdout=PIPE,
-            stderr=None,
-            shell=True,
-        )
-        packages = proc.communicate()[0]
-        packages = packages.decode("utf-8")
-        packages = packages[:-2]
+        def read_proc(cmd):
+            proc = Popen(cmd, stdout=PIPE, stderr=None, shell=True)
+            flatpaks = proc.communicate()[0]
+            flatpaks = flatpaks.decode("utf-8")
+
+            return flatpaks
+
+        # Global flatpak list
+        global_flatpaks = read_proc('flatpak list --app --columns="name,application" | awk  \'BEGIN {FS="\\t"} {print "{\\"name\\":\\""$1"\\",\\"exec\\":\\"/usr/bin/flatpak run "$2"\\"},"}\\\'')
+
+        # User flatpak list
+        local_flatpaks = read_proc('runuser -l '+decky_plugin.DECKY_USER+' -c \'flatpak list --app --columns="name,application"\' | awk  \'BEGIN {FS="\\t"} {print "{\\"name\\":\\""$1"\\",\\"exec\\":\\"/usr/bin/flatpak run "$2"\\"},"}\\\'')
+
+        packages = global_flatpaks + local_flatpaks[:-2] # Remove trailing comma
         return "[" + packages + "]"
 
     async def get_desktops(self):
