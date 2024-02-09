@@ -12,16 +12,23 @@ import {
   SingleDropdownOption,
   DropdownOption,
   DialogButton,
-  Focusable
+  Focusable,
+  FileSelectionType
 } from "decky-frontend-lib";
 import { Fragment, useEffect } from "react";
 import { VFC, useState } from "react";
 import { FaRocket, FaStar, FaRegStar } from "react-icons/fa";
 
-import { App, getLaunchOptions, getTarget } from "./apptypes";
+import { App } from "./apptypes";
 import { Settings } from "./settings";
-import { GridDBPanel, getImagesForGame } from "./steamgriddb";
-import { fetchApps, launchApp, createShortcut } from "./utils";
+import { GridDBPanel } from "./steamgriddb";
+import { fetchApps } from "./utils";
+import { FileOptionsModal } from "./fileoptions";
+import { launchApp, createAppShortcut } from "./appoperations";
+
+enum SpecialSelections {
+  FileShortcut = -1,
+}
 
 let appList: App[] = [];
 
@@ -81,6 +88,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
         }
       })
       .finally(() => {
+        if(settings.get("enableAll")) newDropdownOptions.push({label: "Choose a file...", data: SpecialSelections.FileShortcut} as SingleDropdownOption);
         setDropdownOptions(newDropdownOptions);
         resolve();
       })
@@ -97,29 +105,46 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
     
   }
 
+  async function createFileShortcut() {
+    let lastUsedPath = localStorage.getItem('decky-addtosteam')
+    let deckyUserHome = (await serverAPI.callPluginMethod('get_DECKY_USER_HOME', {})).result
+    let path: string
+    if (lastUsedPath != null) {
+      path = lastUsedPath
+    } else if (typeof deckyUserHome === 'string') {
+      path = deckyUserHome
+    } else {
+      return
+    }
+    let filepath = await serverAPI.openFilePickerV2(
+      FileSelectionType.FILE,
+      path,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      true
+    )
+    if (!filepath) { return }
+
+    const starApp = async (app: App) => {
+      let starredApps = settings.get("starredApps");
+      if(!starredApps.find((a: App) => a.name === app.name && a.exec === app.exec))
+      starredApps.push(app);
+      settings.set("starredApps", starredApps);
+
+      await buildAppList();
+      setSelectedApp(appList.findIndex((a: App) => a.name === app.name && a.exec === app.exec));
+    }
+
+    showModal(<FileOptionsModal filepath={filepath} starApp={starApp} settings={settings} serverAPI={serverAPI}/>)
+  }
+
   function newShortcut() {
-    if(selectedApp === null) return;
-
-    let app = appList[selectedApp];
-    createShortcut(app.name, getLaunchOptions(app), getTarget(app)).then((id:number) => {
-      if(settings.get("useGridDB")) {
-        getImagesForGame(serverAPI, settings.get("gridDBKey"),app.name)
-        .then(images => {
-          if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Grid, "png", 0);
-          if(images.Hero !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Hero, "png", 1);
-          if(images.Logo !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.Logo, "png", 2);
-          //if(images.Grid !== null) SteamClient.Apps.SetCustomArtworkForApp(id, images.GridH, "png", 3);
-        })
-        .catch(() => {}); //Maybe display error to the user in the future?
-      }
-
-      //This should teoretically not be needed with the new SteamClient.Apps.AddShortcut params but they seem to be pretty broken rn. It's not like it hurts either.
-      setTimeout(() => {
-        SteamClient.Apps.SetShortcutName(id, app.name);
-        SteamClient.Apps.SetShortcutLaunchOptions(id, getLaunchOptions(app));
-        SteamClient.Apps.SetShortcutExe(id, `"${getTarget(app)}"`);
-      }, 500)
-    })
+    if(selectedApp != null){
+      createAppShortcut(serverAPI, appList[selectedApp], settings)
+    }
   }
 
   return (
@@ -134,7 +159,11 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
                 selectedOption={selectedApp}
                 onChange={(e: SingleDropdownOption) => {
                   setIsStarred(e.data < settings.get("starredApps").length);
-                  setSelectedApp(e.data);
+                  if(e.data === SpecialSelections.FileShortcut) {
+                    createFileShortcut();
+                    setSelectedApp(null);
+                  } 
+                  else setSelectedApp(e.data);
                 }}
               />
             </div>
