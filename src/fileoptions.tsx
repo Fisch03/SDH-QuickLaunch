@@ -19,21 +19,35 @@ export const FileOptionsModal = (props: {closeModal?: CallableFunction, settings
   const [compatTool, setCompatTool] = useState<string|undefined>()
   const [addToFavorites, setAddToFavorites] = useState<boolean>(false)
   const [addAsShortcut, setAddAsShortcut] = useState<boolean>(false)
+  const [useFolderAsAppName, setUseFolderAsAppName] = useState<boolean>(true)
+  const [fileAppName, setFileAppName] = useState<string>('')
+  const [folderAppName, setFolderAppName] = useState<string>('')
 
   useEffect(()=>{
-    let filenameWithExtension = filepath.realpath.split(/[\\\/]/).pop() // potentially has an extension
-    let filename = filenameWithExtension
-    let fileext = ''
+    let parts = filepath.realpath.split(/[\\\/]/).filter(p => p);
+    let filenameWithExtension = parts.pop() || ''; // 文件名带扩展名
+    let folderName = parts.pop() || 'DefaultFolder'; // 当前文件夹名称
+    let filename = filenameWithExtension;
+    let fileext = '';
     if (filenameWithExtension) {
-      filename = filenameWithExtension.slice(0, filenameWithExtension.lastIndexOf('.'))
-      fileext = filenameWithExtension.slice(filenameWithExtension.lastIndexOf('.')+1, filenameWithExtension.length).toLowerCase()
+      const lastDotIndex = filenameWithExtension.lastIndexOf('.');
+      if (lastDotIndex !== -1) {
+        filename = filenameWithExtension.slice(0, lastDotIndex);
+        fileext = filenameWithExtension.slice(lastDotIndex + 1).toLowerCase();
+      }
     }
-    let path = filepath.realpath.substring(0, filepath.realpath.length - (filenameWithExtension ? filenameWithExtension.length : 0))
-    localStorage.setItem('decky-addtosteam', path)
-    let appName = filename || filenameWithExtension || 'MissingAppName'
-    setAppName(appName)
-    if (['exe', 'bat'].includes(fileext)) setCompatTool('proton-experimental')
-  },[])
+    let path = filepath.realpath.substring(0, filepath.realpath.length - (filenameWithExtension ? filenameWithExtension.length : 0));
+    localStorage.setItem('decky-addtosteam', path);
+    let calculatedFileAppName = filename || filenameWithExtension || 'MissingAppName';
+    setFileAppName(calculatedFileAppName);
+    setFolderAppName(folderName);
+    setAppName(useFolderAsAppName ? folderName : calculatedFileAppName);
+    if (['exe', 'bat'].includes(fileext)) setCompatTool('proton-experimental');
+  },[]);
+
+  useEffect(() => {
+    setAppName(useFolderAsAppName ? folderAppName : fileAppName);
+  }, [useFolderAsAppName, folderAppName, fileAppName]);
 
   const onOK = () => {
     let app: App = {
@@ -92,6 +106,12 @@ export const FileOptionsModal = (props: {closeModal?: CallableFunction, settings
           setAddAsShortcut(addAsShortcut);
           if(addAsShortcut) setAddToFavorites(false);
         }} 
+      />
+
+      <ToggleField 
+        label='Use folder as app name' 
+        checked={useFolderAsAppName} 
+        onChange={value => setUseFolderAsAppName(value)} 
       />
 
       { (addToFavorites || addAsShortcut) && nameField }
