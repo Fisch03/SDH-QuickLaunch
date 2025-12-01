@@ -24,21 +24,51 @@ def split_string(string):
 
 class Plugin:
     async def get_flatpaks(self):
-        def read_proc(cmd):
-            proc = Popen(cmd, stdout=PIPE, stderr=None, shell=True)
-            flatpaks = proc.communicate()[0]
-            flatpaks = flatpaks.decode("utf-8")
+        def list_flatpaks(cmd):
+            flatpaks = []
+
+            clean_env = os.environ.copy()
+            clean_env["LD_LIBRARY_PATH"] = ""
+            with Popen(cmd, stdout=PIPE, stderr=None, env=clean_env, text=True) as p:
+                for line in p.stdout:
+                    if '\t' not in line:
+                        continue
+
+                    name, app_id = line.strip().split('\t', 1)
+
+                    name = name.strip()
+                    app_id = app_id.strip()
+                    if not name or not app_id:
+                        continue
+
+                    flatpaks.append({
+                        "id": app_id,
+                        "name": name,
+                        "exec": f"/usr/bin/flatpak run {app_id}"
+                    })
 
             return flatpaks
 
-        # Global flatpak list
-        global_flatpaks = read_proc('flatpak list --app --columns="name,application" | awk  \'BEGIN {FS="\\t"} {print "{\\"name\\":\\""$1"\\",\\"exec\\":\\"/usr/bin/flatpak run "$2"\\"},"}\\\'')
+        global_flatpaks = list_flatpaks([
+            'flatpak', 'list', '--app', '--columns=name,application'
+        ])
 
-        # User flatpak list
-        local_flatpaks = read_proc('runuser -l '+decky_plugin.DECKY_USER+' -c \'flatpak list --app --columns="name,application"\' | awk  \'BEGIN {FS="\\t"} {print "{\\"name\\":\\""$1"\\",\\"exec\\":\\"/usr/bin/flatpak run "$2"\\"},"}\\\'')
+        local_flatpaks = list_flatpaks([
+            'runuser', '-l', decky_plugin.DECKY_USER, '-c',
+            'flatpak list --app --columns=name,application'
+        ])
 
-        packages = global_flatpaks + local_flatpaks[:-2] # Remove trailing comma
-        return "[" + packages + "]"
+        seen = set()
+        unique_flatpaks = []
+
+        for flatpak in global_flatpaks + local_flatpaks:
+            if flatpak["id"] not in seen:
+                seen.add(flatpak["id"])
+                unique_flatpaks.append(flatpak)
+
+        sorted_items = sorted(unique_flatpaks, key=lambda x: x.get("name", "").lower())
+
+        return jsonDumps(sorted_items)
 
     async def get_desktops(self):
         packages = []
