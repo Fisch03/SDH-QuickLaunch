@@ -59,18 +59,50 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       let starredUpdated = false;
 
       const refreshStarredApps = (discovered: App[]) => {
-        const byName = new Map<string, App>();
-        for (const app of discovered) {
-          byName.set(app.name, app);
-        }
+        const indexUnique = (keyFn: (app: App) => string | undefined) => {
+          const map = new Map<string, App | null>();
+          for (const app of discovered) {
+            const key = keyFn(app);
+            if (!key) continue;
+            map.set(key, map.has(key) ? null : app);
+          }
+          return map;
+        };
+
+        const byDesktopPath = indexUnique((a) => a.desktopPath);
+        const byId = indexUnique((a) => a.id);
+        const byExec = indexUnique((a) => a.exec.trim());
+
         for (const starred of starredApps) {
-          const match = byName.get(starred.name);
+          let match: App | null | undefined;
+          if (starred.desktopPath) {
+            match = byDesktopPath.get(starred.desktopPath) ?? undefined;
+          }
+          if (!match && starred.id) {
+            match = byId.get(starred.id) ?? undefined;
+          }
+          if (!match && !starred.desktopPath) {
+            const trimmedExec = starred.exec.trim();
+            const legacyFlatpak = trimmedExec.match(/^(?:\/usr\/bin\/)?flatpak\s+run\s+(\S+)$/);
+            if (legacyFlatpak) {
+              match = byId.get(legacyFlatpak[1]) ?? undefined;
+            }
+            if (!match) {
+              const execMatch = byExec.get(trimmedExec);
+              if (execMatch && execMatch.name === starred.name) {
+                match = execMatch;
+              }
+            }
+          }
+
           if (
             match &&
-            (starred.exec !== match.exec ||
+            (starred.id !== match.id ||
+              starred.exec !== match.exec ||
               starred.desktopPath !== match.desktopPath ||
               starred.icon !== match.icon)
           ) {
+            starred.id = match.id;
             starred.exec = match.exec;
             starred.desktopPath = match.desktopPath;
             starred.icon = match.icon;

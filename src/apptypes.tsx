@@ -1,4 +1,5 @@
 export interface App {
+  id?: string;
   name: string;
   exec: string;
   compatTool?: string;
