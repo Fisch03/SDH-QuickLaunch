@@ -1,4 +1,4 @@
-import os, json, base64, ssl, certifi, re, struct, shutil, glob, pwd
+import os, json, base64, ssl, certifi, re, struct, shutil, glob, pwd, stat, tempfile
 from pathlib import Path
 from json import dumps as jsonDumps
 from itertools import chain
@@ -247,19 +247,28 @@ class Plugin:
 
     async def prepare_add_non_steam_game(self):
         sentinel = "/tmp/addnonsteamgamefile"
+        fd = None
         try:
-            with open(sentinel, "w", encoding="utf-8"):
-                pass
+            fd = os.open(sentinel, os.O_CREAT | os.O_WRONLY | os.O_NOFOLLOW, 0o666)
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode):
+                return False
             try:
                 pw = pwd.getpwnam(decky_plugin.DECKY_USER)
-                os.chown(sentinel, pw.pw_uid, pw.pw_gid)
+                os.fchown(fd, pw.pw_uid, pw.pw_gid)
             except Exception:
                 pass
-            os.chmod(sentinel, 0o666)
+            os.fchmod(fd, 0o666)
             return True
         except Exception as e:
             decky_plugin.logger.error(f"Failed to create {sentinel}: {e}")
             return False
+        finally:
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except Exception:
+                    pass
 
     async def find_shortcut_appids(self, desktop_path: str):
         if not desktop_path:
@@ -339,13 +348,29 @@ class Plugin:
                             file_modified = True
 
                 if file_modified:
-                    tmp_path = f"{vdf_path}.tmp"
-                    with open(tmp_path, "wb") as f:
-                        f.write(_dump_binary_vdf(parsed))
-                    os.chown(tmp_path, st.st_uid, st.st_gid)
-                    os.chmod(tmp_path, st.st_mode)
-                    os.replace(tmp_path, vdf_path)
-                    updated = True
+                    tmp_path = None
+                    try:
+                        with tempfile.NamedTemporaryFile(
+                            mode="wb",
+                            dir=os.path.dirname(vdf_path),
+                            prefix="shortcuts.",
+                            suffix=".tmp",
+                            delete=False,
+                        ) as tmp_file:
+                            tmp_path = tmp_file.name
+                            tmp_file.write(_dump_binary_vdf(parsed))
+                            tmp_file.flush()
+                            os.fchown(tmp_file.fileno(), st.st_uid, st.st_gid)
+                            os.fchmod(tmp_file.fileno(), st.st_mode)
+                        os.replace(tmp_path, vdf_path)
+                        tmp_path = None
+                        updated = True
+                    finally:
+                        if tmp_path and os.path.exists(tmp_path):
+                            try:
+                                os.unlink(tmp_path)
+                            except Exception:
+                                pass
             except Exception as e:
                 decky_plugin.logger.error(f"Failed to update {vdf_path}: {e}")
 

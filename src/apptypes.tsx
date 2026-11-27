@@ -21,33 +21,42 @@ export function unquote(value: string): string {
 export function splitArgs(cmd: string): string[] {
   const args: string[] = [];
   let current = "";
+  let hasToken = false;
   let inQuotes = false;
   let quoteChar = "";
 
   for (let i = 0; i < cmd.length; i++) {
     const ch = cmd[i];
     if (inQuotes) {
-      if (ch === quoteChar) {
+      if (ch === "\\" && quoteChar === '"' && i + 1 < cmd.length) {
+        current += cmd[++i];
+      } else if (ch === quoteChar) {
         inQuotes = false;
       } else {
         current += ch;
       }
     } else {
-      if (ch === '"' || ch === "'") {
+      if (ch === "\\" && i + 1 < cmd.length) {
+        current += cmd[++i];
+        hasToken = true;
+      } else if (ch === '"' || ch === "'") {
         inQuotes = true;
         quoteChar = ch;
+        hasToken = true;
       } else if (/\s/.test(ch)) {
-        if (current.length > 0) {
+        if (hasToken) {
           args.push(current);
           current = "";
+          hasToken = false;
         }
       } else {
         current += ch;
+        hasToken = true;
       }
     }
   }
 
-  if (current.length > 0) {
+  if (hasToken) {
     args.push(current);
   }
 
@@ -59,7 +68,9 @@ export function formatLaunchOptions(options: string): string {
   if (args.length === 0) {
     return "";
   }
-  return args.map((arg) => `"${arg}"`).join(" ");
+  return args
+    .map((arg) => `"${arg.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)
+    .join(" ");
 }
 
 function splitExec(exec: string): [string, string] {

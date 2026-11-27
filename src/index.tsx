@@ -55,13 +55,36 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       let newDropdownOptions: DropdownOption[] = [];
       appList = [];
 
-      let starredApps = settings.get("starredApps");
+      let starredApps: App[] = settings.get("starredApps");
+      let starredUpdated = false;
+
+      const refreshStarredApps = (discovered: App[]) => {
+        const byName = new Map<string, App>();
+        for (const app of discovered) {
+          byName.set(app.name, app);
+        }
+        for (const starred of starredApps) {
+          const match = byName.get(starred.name);
+          if (
+            match &&
+            (starred.exec !== match.exec ||
+              starred.desktopPath !== match.desktopPath ||
+              starred.icon !== match.icon)
+          ) {
+            starred.exec = match.exec;
+            starred.desktopPath = match.desktopPath;
+            starred.icon = match.icon;
+            starredUpdated = true;
+          }
+        }
+      };
 
       if(starredApps.length > 0)
-        newDropdownOptions.push(...createSubcategory("Starred Apps", settings.get("starredApps")).options);
+        newDropdownOptions.push(...createSubcategory("Starred Apps", starredApps).options);
 
       fetchApps(serverAPI, "flatpaks")
       .then(list => {
+        refreshStarredApps(list);
         list = list.filter(app => {
           for(let starredApp of starredApps) {
             if(starredApp.name === app.name) return false;
@@ -78,6 +101,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       })
       .then(list => {
         if(list.length > 0) {
+          refreshStarredApps(list);
           list = list.filter(app => {
             for(let starredApp of starredApps) {
               if(starredApp.name === app.name) return false;
@@ -88,6 +112,9 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
         }
       })
       .finally(() => {
+        if (starredUpdated) {
+          settings.set("starredApps", starredApps);
+        }
         if(settings.get("enableAll")) newDropdownOptions.push({label: "Choose a file...", data: SpecialSelections.FileShortcut} as SingleDropdownOption);
         setDropdownOptions(newDropdownOptions);
         resolve();

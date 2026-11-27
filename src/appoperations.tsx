@@ -105,6 +105,17 @@ export async function launchApp(sAPI: ServerAPI, app: App) {
     }
   }
 
+  // When switching from a .desktop shortcut to an arbitrary file, remove the previous
+  // temporary [QL] shortcut so it does not retain a stale ShortcutPath in Steam.
+  if (!app.desktopPath) {
+    const prevIdRes = await sAPI.callPluginMethod<any, number>("get_id", {});
+    const prevId = prevIdRes.success && typeof prevIdRes.result === "number" ? prevIdRes.result : -1;
+    if (prevId > 0 && gameIDFromAppID(prevId) !== -1) {
+      SteamClient.Apps.RemoveShortcut(prevId);
+      await sAPI.callPluginMethod("set_id", { id: -1 });
+    }
+  }
+
   let target = unquote(getTarget(app));
   let launchOptions = getLaunchOptions(app);
   let startDir = getStartDir(target);
