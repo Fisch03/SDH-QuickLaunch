@@ -140,6 +140,12 @@ def _find_key_ci(entry: dict, target: str):
 
 
 def _read_shortcuts_vdf(vdf_path: str):
+    st = os.stat(vdf_path)
+    with open(vdf_path, "rb") as f:
+        parsed, _ = _parse_binary_vdf(f.read())
+    shortcuts_key = _find_key_ci(parsed, "shortcuts")
+    shortcuts = parsed[shortcuts_key][1] if shortcuts_key else None
+    return parsed, shortcuts, st
 
 
 class Plugin:
