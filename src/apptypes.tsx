@@ -19,6 +19,7 @@ export function unquote(value: string): string {
   return trimmed;
 }
 
+// Tokenize a command string respecting quotes, backslash escapes, and explicit empty "" args
 export function splitArgs(cmd: string): string[] {
   const args: string[] = [];
   let current = "";

@@ -47,13 +47,16 @@ async function addShortcutFromDesktopFile(
     return -1;
   }
 
+  // Create the /tmp/addnonsteamgamefile sentinel so Steam accepts the local .desktop path
   const prep = await sAPI.callPluginMethod<any, boolean>("prepare_add_non_steam_game", {});
   if (!prep.success || !prep.result) {
     return -1;
   }
 
+  // Trigger Steam's native Desktop "Add to Steam" flow, which sets ShortcutPath in memory
   SteamClient.URL.ExecuteSteamURL(`steam://addnonsteamgame/${encodeURIComponent(desktopPath)}`);
 
+  // Steam assigns the appid asynchronously and flushes shortcuts.vdf shortly after
   for (let attempt = 0; attempt < 15; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 250));
     const appIds = await getMatchingShortcutAppIds(sAPI, desktopPath);

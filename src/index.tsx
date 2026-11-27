@@ -58,12 +58,15 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       let starredApps: App[] = settings.get("starredApps");
       let starredUpdated = false;
 
+      // Migrate legacy starred entries (saved before desktopPath/full Exec support) only when
+      // their desktopPath, id, or executable unambiguously identifies a discovered app.
       const refreshStarredApps = (discovered: App[]) => {
         const indexUnique = (keyFn: (app: App) => string | undefined) => {
           const map = new Map<string, App | null>();
           for (const app of discovered) {
             const key = keyFn(app);
             if (!key) continue;
+            // Mark collisions as null so ambiguous keys never overwrite a favorite
             map.set(key, map.has(key) ? null : app);
           }
           return map;

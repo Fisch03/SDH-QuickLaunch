@@ -57,6 +57,8 @@ def parse_desktop_file(path: Path):
 
 
 def _parse_binary_vdf(data: bytes, pos: int = 0):
+    # Steam's shortcuts.vdf uses Valve's binary VDF format:
+    # 0x00=dict, 0x01=utf8 string, 0x02=uint32, 0x03=float32, 0x07=uint64, 0x08=end-of-dict
     res = {}
     length = len(data)
     while pos < length:
@@ -246,6 +248,8 @@ class Plugin:
         return jsonDumps(packages)
 
     async def prepare_add_non_steam_game(self):
+        # Steam only accepts local .desktop paths on steam://addnonsteamgame/ while this sentinel exists.
+        # Open with O_NOFOLLOW + fstat/fchown/fchmod since the Decky backend runs as root.
         sentinel = "/tmp/addnonsteamgamefile"
         fd = None
         try:
@@ -311,6 +315,8 @@ class Plugin:
         return appids[-1] if appids else -1
 
     async def set_shortcut_path(self, appid: int, desktop_path: str, icon: str = ""):
+        # Fallback for shortcuts created via AddShortcut: Steam treats shortcuts without a
+        # .desktop ShortcutPath as generic executables and wraps them with Proton/compatdata.
         if not desktop_path:
             return False
         target_appid = int(appid) & 0xFFFFFFFF
