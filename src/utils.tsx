@@ -1,9 +1,18 @@
 import { ServerAPI } from "decky-frontend-lib";
 
-import { App } from "./apptypes";
+import { App, getStartDir, unquote } from "./apptypes";
 
-export const createShortcut = (name: string, launchOptions: string = "", target:string = "") => {
-    return SteamClient.Apps.AddShortcut(name,"/usr/bin/ifyouseethisyoufoundabug", target, launchOptions); //The Part after the last Slash does not matter because it should always be replaced when launching an app
+const DEFAULT_SHORTCUT_TARGET = "/usr/bin/flatpak";
+
+export const createShortcut = (
+    name: string,
+    target: string = DEFAULT_SHORTCUT_TARGET,
+    launchOptions: string = "",
+    startDir?: string
+) => {
+    const cleanTarget = unquote(target) || DEFAULT_SHORTCUT_TARGET;
+    const shortcutStartDir = startDir !== undefined ? unquote(startDir) : getStartDir(cleanTarget);
+    return SteamClient.Apps.AddShortcut(name, cleanTarget, shortcutStartDir, launchOptions);
 }
 
 export const gameIDFromAppID = (appid: number) => {
@@ -35,18 +44,19 @@ export async function fetchApps(sAPI: ServerAPI, type: string): Promise<App[]> {
     return apps
   }
 
-export const getShortcutID = async (sAPI: ServerAPI) => {
+export const getShortcutID = async (
+    sAPI: ServerAPI,
+    target: string = DEFAULT_SHORTCUT_TARGET,
+    launchOptions: string = ""
+) => {
     const result = await sAPI.callPluginMethod<any, number>("get_id", {})
 
     if(result.success) {
         let id: number = result.result;
 
-        if(id == -1) {
-            id = await createShortcut("QuickLaunch");
-            sAPI.callPluginMethod("set_id", {id: id});
-        } else if(await gameIDFromAppID(id) == -1) {
-            id = await createShortcut("QuickLaunch");
-            sAPI.callPluginMethod("set_id", {id: id});
+        if(id == -1 || gameIDFromAppID(id) == -1) {
+            id = await createShortcut("QuickLaunch", target, launchOptions);
+            await sAPI.callPluginMethod("set_id", {id: id});
         }
 
         return id

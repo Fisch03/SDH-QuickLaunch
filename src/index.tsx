@@ -55,13 +55,71 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       let newDropdownOptions: DropdownOption[] = [];
       appList = [];
 
-      let starredApps = settings.get("starredApps");
+      let starredApps: App[] = settings.get("starredApps");
+      let starredUpdated = false;
+
+      // Migrate legacy starred entries (saved before desktopPath/full Exec support) only when
+      // their desktopPath, id, or executable unambiguously identifies a discovered app.
+      const refreshStarredApps = (discovered: App[]) => {
+        const indexUnique = (keyFn: (app: App) => string | undefined) => {
+          const map = new Map<string, App | null>();
+          for (const app of discovered) {
+            const key = keyFn(app);
+            if (!key) continue;
+            // Mark collisions as null so ambiguous keys never overwrite a favorite
+            map.set(key, map.has(key) ? null : app);
+          }
+          return map;
+        };
+
+        const byDesktopPath = indexUnique((a) => a.desktopPath);
+        const byId = indexUnique((a) => a.id);
+        const byExec = indexUnique((a) => a.exec.trim());
+
+        for (const starred of starredApps) {
+          let match: App | null | undefined;
+          if (starred.desktopPath) {
+            match = byDesktopPath.get(starred.desktopPath) ?? undefined;
+          }
+          if (!match && starred.id) {
+            match = byId.get(starred.id) ?? undefined;
+          }
+          if (!match && !starred.desktopPath) {
+            const trimmedExec = starred.exec.trim();
+            const legacyFlatpak = trimmedExec.match(/^(?:\/usr\/bin\/)?flatpak\s+run\s+(\S+)$/);
+            if (legacyFlatpak) {
+              match = byId.get(legacyFlatpak[1]) ?? undefined;
+            }
+            if (!match) {
+              const execMatch = byExec.get(trimmedExec);
+              if (execMatch && execMatch.name === starred.name) {
+                match = execMatch;
+              }
+            }
+          }
+
+          if (
+            match &&
+            (starred.id !== match.id ||
+              starred.exec !== match.exec ||
+              starred.desktopPath !== match.desktopPath ||
+              starred.icon !== match.icon)
+          ) {
+            starred.id = match.id;
+            starred.exec = match.exec;
+            starred.desktopPath = match.desktopPath;
+            starred.icon = match.icon;
+            starredUpdated = true;
+          }
+        }
+      };
 
       if(starredApps.length > 0)
-        newDropdownOptions.push(...createSubcategory("Starred Apps", settings.get("starredApps")).options);
+        newDropdownOptions.push(...createSubcategory("Starred Apps", starredApps).options);
 
       fetchApps(serverAPI, "flatpaks")
       .then(list => {
+        refreshStarredApps(list);
         list = list.filter(app => {
           for(let starredApp of starredApps) {
             if(starredApp.name === app.name) return false;
@@ -78,6 +136,7 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
       })
       .then(list => {
         if(list.length > 0) {
+          refreshStarredApps(list);
           list = list.filter(app => {
             for(let starredApp of starredApps) {
               if(starredApp.name === app.name) return false;
@@ -88,6 +147,9 @@ const Content: VFC<{ serverAPI: ServerAPI }> = ({ serverAPI }) => {
         }
       })
       .finally(() => {
+        if (starredUpdated) {
+          settings.set("starredApps", starredApps);
+        }
         if(settings.get("enableAll")) newDropdownOptions.push({label: "Choose a file...", data: SpecialSelections.FileShortcut} as SingleDropdownOption);
         setDropdownOptions(newDropdownOptions);
         resolve();
