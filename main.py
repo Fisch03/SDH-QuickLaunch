@@ -350,12 +350,13 @@ class Plugin:
                 decky_plugin.logger.error(f"Failed to update {vdf_path}: {e}")
 
         # Remove any stale Proton compatdata directory created for this native shortcut
-        try:
-            compat_dir = _get_steam_root() / "steamapps" / "compatdata" / str(target_appid)
-            if compat_dir.exists() and compat_dir.is_dir():
-                shutil.rmtree(compat_dir, ignore_errors=True)
-        except Exception as e:
-            decky_plugin.logger.error(f"Failed to clean compatdata for {target_appid}: {e}")
+        if updated and target_appid >= 0x80000000:
+            try:
+                compat_dir = _get_steam_root() / "steamapps" / "compatdata" / str(target_appid)
+                if compat_dir.exists() and compat_dir.is_dir():
+                    shutil.rmtree(compat_dir, ignore_errors=True)
+            except Exception as e:
+                decky_plugin.logger.error(f"Failed to clean compatdata for {target_appid}: {e}")
 
         return updated
 
