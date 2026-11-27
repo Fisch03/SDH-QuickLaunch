@@ -123,8 +123,13 @@ def _get_steam_root() -> Path:
     return home / ".steam" / "root"
 
 
-def _get_shortcuts_vdf_paths():
+def _get_shortcuts_vdf_paths(account_id: str = ""):
     steam_root = _get_steam_root()
+    if account_id:
+        if not account_id.isdigit():
+            return []
+        candidate = steam_root / "userdata" / account_id / "config" / "shortcuts.vdf"
+        return [str(candidate)] if candidate.exists() else []
     pattern = str(steam_root / "userdata" / "*" / "config" / "shortcuts.vdf")
     return sorted(glob.glob(pattern))
 
@@ -274,7 +279,7 @@ class Plugin:
                 except Exception:
                     pass
 
-    async def find_shortcut_appids(self, desktop_path: str):
+    async def find_shortcut_appids(self, desktop_path: str, account_id: str = ""):
         if not desktop_path:
             return []
         targets = {desktop_path}
@@ -284,7 +289,7 @@ class Plugin:
             pass
 
         matched = []
-        for vdf_path in _get_shortcuts_vdf_paths():
+        for vdf_path in _get_shortcuts_vdf_paths(account_id):
             try:
                 with open(vdf_path, "rb") as f:
                     parsed, _ = _parse_binary_vdf(f.read())
@@ -310,11 +315,11 @@ class Plugin:
                 decky_plugin.logger.error(f"Failed to read {vdf_path}: {e}")
         return matched
 
-    async def find_shortcut_appid(self, desktop_path: str):
-        appids = await self.find_shortcut_appids(desktop_path)
+    async def find_shortcut_appid(self, desktop_path: str, account_id: str = ""):
+        appids = await self.find_shortcut_appids(desktop_path, account_id)
         return appids[-1] if appids else -1
 
-    async def set_shortcut_path(self, appid: int, desktop_path: str, icon: str = ""):
+    async def set_shortcut_path(self, appid: int, desktop_path: str, icon: str = "", account_id: str = ""):
         # Fallback for shortcuts created via AddShortcut: Steam treats shortcuts without a
         # .desktop ShortcutPath as generic executables and wraps them with Proton/compatdata.
         if not desktop_path:
@@ -322,7 +327,7 @@ class Plugin:
         target_appid = int(appid) & 0xFFFFFFFF
         updated = False
 
-        for vdf_path in _get_shortcuts_vdf_paths():
+        for vdf_path in _get_shortcuts_vdf_paths(account_id):
             try:
                 st = os.stat(vdf_path)
                 with open(vdf_path, "rb") as f:
