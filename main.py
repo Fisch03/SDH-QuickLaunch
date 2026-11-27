@@ -1,4 +1,4 @@
-import os, json, base64, ssl, certifi, re, struct, shutil, glob, pwd, stat, tempfile
+import os, json, base64, ssl, certifi, re, struct, shutil, pwd, stat, tempfile
 from pathlib import Path
 from json import dumps as jsonDumps
 from itertools import chain
@@ -123,15 +123,12 @@ def _get_steam_root() -> Path:
     return home / ".steam" / "root"
 
 
-def _get_shortcuts_vdf_paths(account_id: str = ""):
+def _get_shortcuts_vdf_path(account_id: str = ""):
+    if not account_id or not account_id.isdigit():
+        return None
     steam_root = _get_steam_root()
-    if account_id:
-        if not account_id.isdigit():
-            return []
-        candidate = steam_root / "userdata" / account_id / "config" / "shortcuts.vdf"
-        return [str(candidate)] if candidate.exists() else []
-    pattern = str(steam_root / "userdata" / "*" / "config" / "shortcuts.vdf")
-    return sorted(glob.glob(pattern))
+    candidate = steam_root / "userdata" / account_id / "config" / "shortcuts.vdf"
+    return str(candidate) if candidate.exists() else None
 
 
 def _find_key_ci(entry: dict, target: str):
@@ -282,6 +279,10 @@ class Plugin:
     async def find_shortcut_appids(self, desktop_path: str, account_id: str = ""):
         if not desktop_path:
             return []
+        vdf_path = _get_shortcuts_vdf_path(account_id)
+        if not vdf_path:
+            return []
+
         targets = {desktop_path}
         try:
             targets.add(str(Path(desktop_path).resolve()))
@@ -289,30 +290,29 @@ class Plugin:
             pass
 
         matched = []
-        for vdf_path in _get_shortcuts_vdf_paths(account_id):
-            try:
-                with open(vdf_path, "rb") as f:
-                    parsed, _ = _parse_binary_vdf(f.read())
-                shortcuts_key = _find_key_ci(parsed, "shortcuts")
-                if not shortcuts_key:
+        try:
+            with open(vdf_path, "rb") as f:
+                parsed, _ = _parse_binary_vdf(f.read())
+            shortcuts_key = _find_key_ci(parsed, "shortcuts")
+            if not shortcuts_key:
+                return []
+            shortcuts = parsed[shortcuts_key][1]
+            for _, entry_pair in shortcuts.items():
+                if entry_pair[0] != 0x00:
                     continue
-                shortcuts = parsed[shortcuts_key][1]
-                for _, entry_pair in shortcuts.items():
-                    if entry_pair[0] != 0x00:
-                        continue
-                    entry = entry_pair[1]
-                    sp_key = _find_key_ci(entry, "ShortcutPath")
-                    if not sp_key:
-                        continue
-                    sp_val = entry[sp_key][1]
-                    if sp_val in targets:
-                        appid_key = _find_key_ci(entry, "appid")
-                        if appid_key:
-                            aid = int(entry[appid_key][1]) & 0xFFFFFFFF
-                            if aid not in matched:
-                                matched.append(aid)
-            except Exception as e:
-                decky_plugin.logger.error(f"Failed to read {vdf_path}: {e}")
+                entry = entry_pair[1]
+                sp_key = _find_key_ci(entry, "ShortcutPath")
+                if not sp_key:
+                    continue
+                sp_val = entry[sp_key][1]
+                if sp_val in targets:
+                    appid_key = _find_key_ci(entry, "appid")
+                    if appid_key:
+                        aid = int(entry[appid_key][1]) & 0xFFFFFFFF
+                        if aid not in matched:
+                            matched.append(aid)
+        except Exception as e:
+            decky_plugin.logger.error(f"Failed to read {vdf_path}: {e}")
         return matched
 
     async def find_shortcut_appid(self, desktop_path: str, account_id: str = ""):
@@ -324,66 +324,69 @@ class Plugin:
         # .desktop ShortcutPath as generic executables and wraps them with Proton/compatdata.
         if not desktop_path:
             return False
+        vdf_path = _get_shortcuts_vdf_path(account_id)
+        if not vdf_path:
+            return False
+
         target_appid = int(appid) & 0xFFFFFFFF
         updated = False
 
-        for vdf_path in _get_shortcuts_vdf_paths(account_id):
-            try:
-                st = os.stat(vdf_path)
-                with open(vdf_path, "rb") as f:
-                    parsed, _ = _parse_binary_vdf(f.read())
-                shortcuts_key = _find_key_ci(parsed, "shortcuts")
-                if not shortcuts_key:
+        try:
+            st = os.stat(vdf_path)
+            with open(vdf_path, "rb") as f:
+                parsed, _ = _parse_binary_vdf(f.read())
+            shortcuts_key = _find_key_ci(parsed, "shortcuts")
+            if not shortcuts_key:
+                return False
+            shortcuts = parsed[shortcuts_key][1]
+            file_modified = False
+            for _, entry_pair in shortcuts.items():
+                if entry_pair[0] != 0x00:
                     continue
-                shortcuts = parsed[shortcuts_key][1]
-                file_modified = False
-                for _, entry_pair in shortcuts.items():
-                    if entry_pair[0] != 0x00:
-                        continue
-                    entry = entry_pair[1]
-                    appid_key = _find_key_ci(entry, "appid")
-                    if not appid_key:
-                        continue
-                    if (int(entry[appid_key][1]) & 0xFFFFFFFF) != target_appid:
-                        continue
+                entry = entry_pair[1]
+                appid_key = _find_key_ci(entry, "appid")
+                if not appid_key:
+                    continue
+                if (int(entry[appid_key][1]) & 0xFFFFFFFF) != target_appid:
+                    continue
 
-                    sp_key = _find_key_ci(entry, "ShortcutPath") or "ShortcutPath"
-                    if sp_key not in entry or entry[sp_key][1] != desktop_path:
-                        entry[sp_key] = (0x01, desktop_path)
+                sp_key = _find_key_ci(entry, "ShortcutPath") or "ShortcutPath"
+                if sp_key not in entry or entry[sp_key][1] != desktop_path:
+                    entry[sp_key] = (0x01, desktop_path)
+                    file_modified = True
+
+                if icon:
+                    icon_key = _find_key_ci(entry, "icon") or "icon"
+                    if icon_key not in entry or not entry[icon_key][1]:
+                        entry[icon_key] = (0x01, icon)
                         file_modified = True
 
-                    if icon:
-                        icon_key = _find_key_ci(entry, "icon") or "icon"
-                        if icon_key not in entry or not entry[icon_key][1]:
-                            entry[icon_key] = (0x01, icon)
-                            file_modified = True
-
-                if file_modified:
+            if file_modified:
+                tmp_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        mode="wb",
+                        dir=os.path.dirname(vdf_path),
+                        prefix="shortcuts.",
+                        suffix=".tmp",
+                        delete=False,
+                    ) as tmp_file:
+                        tmp_path = tmp_file.name
+                        tmp_file.write(_dump_binary_vdf(parsed))
+                        tmp_file.flush()
+                        os.fchown(tmp_file.fileno(), st.st_uid, st.st_gid)
+                        os.fchmod(tmp_file.fileno(), st.st_mode)
+                    os.replace(tmp_path, vdf_path)
                     tmp_path = None
-                    try:
-                        with tempfile.NamedTemporaryFile(
-                            mode="wb",
-                            dir=os.path.dirname(vdf_path),
-                            prefix="shortcuts.",
-                            suffix=".tmp",
-                            delete=False,
-                        ) as tmp_file:
-                            tmp_path = tmp_file.name
-                            tmp_file.write(_dump_binary_vdf(parsed))
-                            tmp_file.flush()
-                            os.fchown(tmp_file.fileno(), st.st_uid, st.st_gid)
-                            os.fchmod(tmp_file.fileno(), st.st_mode)
-                        os.replace(tmp_path, vdf_path)
-                        tmp_path = None
-                        updated = True
-                    finally:
-                        if tmp_path and os.path.exists(tmp_path):
-                            try:
-                                os.unlink(tmp_path)
-                            except Exception:
-                                pass
-            except Exception as e:
-                decky_plugin.logger.error(f"Failed to update {vdf_path}: {e}")
+                    updated = True
+                finally:
+                    if tmp_path and os.path.exists(tmp_path):
+                        try:
+                            os.unlink(tmp_path)
+                        except Exception:
+                            pass
+        except Exception as e:
+            decky_plugin.logger.error(f"Failed to update {vdf_path}: {e}")
 
         # Remove any stale Proton compatdata directory created for this native shortcut
         if updated and target_appid >= 0x80000000:

@@ -24,7 +24,7 @@ function getActiveAccountId(): string {
       return BigInt.asUintN(32, BigInt(steam64)).toString();
     }
   } catch {
-    // Fall back to scanning all userdata directories if m_CurrentUser is unavailable
+    // Return empty so VDF lookup/updates are skipped when active user is unavailable
   }
   return "";
 }
