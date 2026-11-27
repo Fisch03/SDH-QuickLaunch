@@ -56,7 +56,7 @@ export const getShortcutID = async (
 
         if(id == -1 || gameIDFromAppID(id) == -1) {
             id = await createShortcut("QuickLaunch", target, launchOptions);
-            sAPI.callPluginMethod("set_id", {id: id});
+            await sAPI.callPluginMethod("set_id", {id: id});
         }
 
         return id

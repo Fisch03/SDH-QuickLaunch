@@ -101,14 +101,40 @@ async function addShortcutFromDesktopFile(
   return appIds.length > 0 ? appIds[appIds.length - 1] : -1;
 }
 
+async function getSavedShortcutId(sAPI: ServerAPI): Promise<number> {
+  const res = await sAPI.callPluginMethod<any, number>("get_id", {});
+  return res.success && typeof res.result === "number" ? res.result : -1;
+}
+
+async function clearSavedShortcut(sAPI: ServerAPI): Promise<void> {
+  const prevId = await getSavedShortcutId(sAPI);
+  if (prevId > 0 && gameIDFromAppID(prevId) !== -1) {
+    SteamClient.Apps.RemoveShortcut(prevId);
+    await sAPI.callPluginMethod("set_id", { id: -1 });
+  }
+}
+
+function applyShortcutProperties(
+  id: number,
+  name: string,
+  target: string,
+  startDir: string,
+  launchOptions: string,
+  compatTool?: string
+) {
+  SteamClient.Apps.SetShortcutName(id, name);
+  SteamClient.Apps.SetShortcutLaunchOptions(id, launchOptions);
+  SteamClient.Apps.SetShortcutExe(id, `"${target}"`);
+  SteamClient.Apps.SetShortcutStartDir(id, startDir);
+  SteamClient.Apps.SpecifyCompatTool(id, compatTool ?? "");
+}
+
 export function launchApp(sAPI: ServerAPI, app: App): Promise<void> {
   return enqueueShortcutOp(async () => {
     const accountId = getActiveAccountId();
 
     if (app.desktopPath && !app.compatTool) {
       const existingIds = await getMatchingShortcutAppIds(sAPI, app.desktopPath, accountId);
-      const prevIdRes = await sAPI.callPluginMethod<any, number>("get_id", {});
-      const prevId = prevIdRes.success && typeof prevIdRes.result === "number" ? prevIdRes.result : -1;
 
       // If a native shortcut for this .desktop already exists in Steam (either our [QL] shortcut
       // or a permanent shortcut), launch it directly without duplicating or modifying it.
@@ -120,12 +146,8 @@ export function launchApp(sAPI: ServerAPI, app: App): Promise<void> {
         }
       }
 
-      // Remove the previous [QL] shortcut before creating a fresh native one so QuickLaunch
-      // keeps at most one temporary [QL] entry in the library.
-      if (prevId > 0 && gameIDFromAppID(prevId) !== -1) {
-        SteamClient.Apps.RemoveShortcut(prevId);
-        await sAPI.callPluginMethod("set_id", { id: -1 });
-      }
+      // Remove the previous [QL] shortcut so QuickLaunch keeps at most one temporary entry.
+      await clearSavedShortcut(sAPI);
 
       const nativeId = await addShortcutFromDesktopFile(
         sAPI,
@@ -134,8 +156,7 @@ export function launchApp(sAPI: ServerAPI, app: App): Promise<void> {
         new Set(existingIds)
       );
       if (nativeId > 0) {
-        const isNewShortcut = !existingIds.includes(nativeId);
-        if (isNewShortcut) {
+        if (!existingIds.includes(nativeId)) {
           await sAPI.callPluginMethod("set_id", { id: nativeId });
           SteamClient.Apps.SetShortcutName(nativeId, `[QL] ${app.name}`);
         }
@@ -147,15 +168,10 @@ export function launchApp(sAPI: ServerAPI, app: App): Promise<void> {
       }
     }
 
-    // When switching from a .desktop shortcut to an arbitrary file, remove the previous
-    // temporary [QL] shortcut so it does not retain a stale ShortcutPath in Steam.
+    // Remove the previous [QL] shortcut when switching to a non-.desktop file so it does not
+    // retain a stale ShortcutPath in Steam.
     if (!app.desktopPath) {
-      const prevIdRes = await sAPI.callPluginMethod<any, number>("get_id", {});
-      const prevId = prevIdRes.success && typeof prevIdRes.result === "number" ? prevIdRes.result : -1;
-      if (prevId > 0 && gameIDFromAppID(prevId) !== -1) {
-        SteamClient.Apps.RemoveShortcut(prevId);
-        await sAPI.callPluginMethod("set_id", { id: -1 });
-      }
+      await clearSavedShortcut(sAPI);
     }
 
     let target = unquote(getTarget(app));
@@ -164,11 +180,7 @@ export function launchApp(sAPI: ServerAPI, app: App): Promise<void> {
     let id: number = await getShortcutID(sAPI, target, launchOptions);
     if (id === -1) return;
 
-    SteamClient.Apps.SetShortcutName(id, `[QL] ${app.name}`);
-    SteamClient.Apps.SetShortcutLaunchOptions(id, launchOptions);
-    SteamClient.Apps.SetShortcutExe(id, `"${target}"`);
-    SteamClient.Apps.SetShortcutStartDir(id, startDir);
-    SteamClient.Apps.SpecifyCompatTool(id, app.compatTool === undefined ? "" : app.compatTool);
+    applyShortcutProperties(id, `[QL] ${app.name}`, target, startDir, launchOptions, app.compatTool);
 
     if (app.desktopPath) {
       await sAPI.callPluginMethod("set_shortcut_path", {
@@ -180,8 +192,7 @@ export function launchApp(sAPI: ServerAPI, app: App): Promise<void> {
     }
 
     await new Promise((resolve) => setTimeout(resolve, 500));
-    let gid = gameIDFromAppID(id);
-    SteamClient.Apps.RunGame(gid, "", -1, 100);
+    SteamClient.Apps.RunGame(gameIDFromAppID(id), "", -1, 100);
   });
 }
 
@@ -200,8 +211,7 @@ export function createAppShortcut(
     // identically to Desktop Mode "Add to Steam" without requiring a Steam restart.
     if (app.desktopPath && !app.compatTool && launchOptions === undefined && target === undefined) {
       const existingIds = await getMatchingShortcutAppIds(sAPI, app.desktopPath, accountId);
-      const prevIdRes = await sAPI.callPluginMethod<any, number>("get_id", {});
-      const prevId = prevIdRes.success && typeof prevIdRes.result === "number" ? prevIdRes.result : -1;
+      const prevId = await getSavedShortcutId(sAPI);
 
       const nativeId = await addShortcutFromDesktopFile(
         sAPI,
@@ -230,11 +240,7 @@ export function createAppShortcut(
     applyGridDBArtwork(sAPI, settings, id, app.name);
 
     await new Promise((resolve) => setTimeout(resolve, 500));
-    SteamClient.Apps.SetShortcutName(id, app.name);
-    SteamClient.Apps.SetShortcutLaunchOptions(id, shortcutLaunchOptions);
-    SteamClient.Apps.SetShortcutExe(id, `"${shortcutTarget}"`);
-    SteamClient.Apps.SetShortcutStartDir(id, shortcutStartDir);
-    SteamClient.Apps.SpecifyCompatTool(id, app.compatTool === undefined ? "" : app.compatTool);
+    applyShortcutProperties(id, app.name, shortcutTarget, shortcutStartDir, shortcutLaunchOptions, app.compatTool);
 
     if (app.desktopPath) {
       await new Promise((resolve) => setTimeout(resolve, 500));

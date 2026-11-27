@@ -139,6 +139,9 @@ def _find_key_ci(entry: dict, target: str):
     return None
 
 
+def _read_shortcuts_vdf(vdf_path: str):
+
+
 class Plugin:
     async def get_flatpaks(self):
         # Index installed Flatpak .desktop files to get their real name, full Exec command, path, and icon
@@ -291,21 +294,15 @@ class Plugin:
 
         matched = []
         try:
-            with open(vdf_path, "rb") as f:
-                parsed, _ = _parse_binary_vdf(f.read())
-            shortcuts_key = _find_key_ci(parsed, "shortcuts")
-            if not shortcuts_key:
+            _, shortcuts, _ = _read_shortcuts_vdf(vdf_path)
+            if not shortcuts:
                 return []
-            shortcuts = parsed[shortcuts_key][1]
             for _, entry_pair in shortcuts.items():
                 if entry_pair[0] != 0x00:
                     continue
                 entry = entry_pair[1]
                 sp_key = _find_key_ci(entry, "ShortcutPath")
-                if not sp_key:
-                    continue
-                sp_val = entry[sp_key][1]
-                if sp_val in targets:
+                if sp_key and entry[sp_key][1] in targets:
                     appid_key = _find_key_ci(entry, "appid")
                     if appid_key:
                         aid = int(entry[appid_key][1]) & 0xFFFFFFFF
@@ -314,10 +311,6 @@ class Plugin:
         except Exception as e:
             decky_plugin.logger.error(f"Failed to read {vdf_path}: {e}")
         return matched
-
-    async def find_shortcut_appid(self, desktop_path: str, account_id: str = ""):
-        appids = await self.find_shortcut_appids(desktop_path, account_id)
-        return appids[-1] if appids else -1
 
     async def set_shortcut_path(self, appid: int, desktop_path: str, icon: str = "", account_id: str = ""):
         # Fallback for shortcuts created via AddShortcut: Steam treats shortcuts without a
@@ -332,13 +325,9 @@ class Plugin:
         updated = False
 
         try:
-            st = os.stat(vdf_path)
-            with open(vdf_path, "rb") as f:
-                parsed, _ = _parse_binary_vdf(f.read())
-            shortcuts_key = _find_key_ci(parsed, "shortcuts")
-            if not shortcuts_key:
+            parsed, shortcuts, st = _read_shortcuts_vdf(vdf_path)
+            if not shortcuts:
                 return False
-            shortcuts = parsed[shortcuts_key][1]
             file_modified = False
             for _, entry_pair in shortcuts.items():
                 if entry_pair[0] != 0x00:
